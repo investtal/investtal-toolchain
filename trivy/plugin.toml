@@ -1,0 +1,46 @@
+# @investtal/proto-plugins — trivy
+#
+# Vendored proto TOML plugin for the Trivy vulnerability / IaC scanner.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from ageha734/proto-plugins (toml/trivy.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/aquasecurity/trivy
+# Integrity   : download-file checksum IS verified — upstream ships a standard
+#               `<sha256>  <file>` checksums.txt (checksum-url below).
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "trivy"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/aquasecurity/trivy"
+
+[platform.linux]
+download-file = "trivy_{version}_Linux-{arch}.tar.gz"
+checksum-file = "trivy_{version}_checksums.txt"
+exe-path = "trivy"
+
+[platform.macos]
+download-file = "trivy_{version}_macOS-{arch}.tar.gz"
+checksum-file = "trivy_{version}_checksums.txt"
+exe-path = "trivy"
+
+[platform.windows]
+download-file = "trivy_{version}_windows-{arch}.zip"
+checksum-file = "trivy_{version}_checksums.txt"
+exe-path = "trivy.exe"
+
+[install]
+download-url = "https://github.com/aquasecurity/trivy/releases/download/v{version}/{download_file}"
+checksum-url = "https://github.com/aquasecurity/trivy/releases/download/v{version}/{checksum_file}"
+unpack = true
+
+[install.arch]
+x64 = "64bit"
+x86_64 = "64bit"
+arm = "ARM"
+arm64 = "ARM64"
+aarch64 = "ARM64"

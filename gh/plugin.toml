@@ -1,0 +1,45 @@
+# @investtal/proto-plugins — gh (GitHub CLI)
+#
+# Vendored proto TOML plugin for the GitHub CLI.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from appthrust/proto-toml-plugins (gh/plugin.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/cli/cli
+# HARDENED    : upstream community plugin declared `checksum-file` but had NO
+#               `checksum-url`, so downloaded binaries were NEVER verified. The
+#               gh release ships a standard `<sha256>  <file>` checksums.txt, so
+#               we add `checksum-url` below to actually enforce integrity.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "GitHub CLI"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/cli/cli"
+
+[platform.linux]
+exe-path = "gh_{version}_linux_{arch}/bin/gh"
+download-file = "gh_{version}_linux_{arch}.tar.gz"
+checksum-file = "gh_{version}_checksums.txt"
+
+[platform.macos]
+exe-path = "gh_{version}_macOS_{arch}/bin/gh"
+download-file = "gh_{version}_macOS_{arch}.zip"
+checksum-file = "gh_{version}_checksums.txt"
+
+[platform.windows]
+exe-path = "bin/gh.exe"
+download-file = "gh_{version}_windows_{arch}.zip"
+checksum-file = "gh_{version}_checksums.txt"
+
+[install]
+download-url = "https://github.com/cli/cli/releases/download/v{version}/{download_file}"
+checksum-url = "https://github.com/cli/cli/releases/download/v{version}/{checksum_file}"
+
+[install.arch]
+aarch64 = "arm64"
+x86_64 = "amd64"
+x86 = "386"

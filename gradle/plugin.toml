@@ -1,0 +1,49 @@
+# @investtal/proto-plugins — gradle
+#
+# Vendored proto TOML plugin for the Gradle build tool.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from eplightning/openjdk-adoptium-proto-plugin
+#              (build-plugins/gradle.toml — the non-WASM TOML plugin shipped
+#              alongside that repo's openjdk WASM plugin)
+# Audited     : 2026-06-23
+# Upstream    : https://gradle.org  (distributions at services.gradle.org)
+# Integrity   : download-file checksum IS verified — Gradle publishes a bare
+#               single-line `<sha256>` file per distribution (checksum-url).
+# Resolve     : versions come from the Gradle services manifest, not git tags.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "Gradle"
+type = "cli"
+
+[platform.linux]
+download-file = "gradle-{version}-bin.zip"
+checksum-file = "gradle-{version}-bin.zip.sha256"
+archive-prefix = "gradle-{version}"
+exe-path = "bin/gradle"
+
+[platform.macos]
+download-file = "gradle-{version}-bin.zip"
+checksum-file = "gradle-{version}-bin.zip.sha256"
+archive-prefix = "gradle-{version}"
+exe-path = "bin/gradle"
+
+[platform.windows]
+download-file = "gradle-{version}-bin.zip"
+checksum-file = "gradle-{version}-bin.zip.sha256"
+archive-prefix = "gradle-{version}"
+exe-path = "bin/gradle.bat"
+
+[install]
+download-url = "https://services.gradle.org/distributions/{download_file}"
+checksum-url = "https://services.gradle.org/distributions/{checksum_file}"
+
+[install.exes]
+[install.exes.gradle]
+primary = true
+
+[resolve]
+manifest-url = "https://services.gradle.org/versions/all"
+manifest-version-key = "version"

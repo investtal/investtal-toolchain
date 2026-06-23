@@ -1,0 +1,42 @@
+# @investtal/proto-plugins — yq
+#
+# Vendored proto TOML plugin for the yq YAML/JSON processor.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from appthrust/proto-toml-plugins (yq/plugin.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/mikefarah/yq
+#
+# INTEGRITY NOTE — no checksum verification is possible for yq.
+#   mikefarah/yq does NOT publish a standard `<sha256>  <file>` checksums file.
+#   Its `checksums` artifact is a non-standard, multi-column, multi-algorithm
+#   table (CRC32 MD4 MD5 SHA1 ... SHA256 ...) that proto's checksum parser
+#   cannot consume. There is therefore no `checksum-file` / `checksum-url`.
+#   Integrity for yq rests on: (1) HTTPS transport to github.com, (2) the
+#   version being pinned in .prototools, and (3) this plugin being vendored.
+#   If yq ever ships a parseable checksum file, add checksum-url here.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "yq"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/mikefarah/yq"
+
+[platform.linux]
+download-file = "yq_linux_{arch}"
+
+[platform.macos]
+download-file = "yq_darwin_{arch}"
+
+[platform.windows]
+download-file = "yq_windows_{arch}.exe"
+
+[install]
+download-url = "https://github.com/mikefarah/yq/releases/download/v{version}/{download_file}"
+
+[install.arch]
+aarch64 = "arm64"
+x86_64 = "amd64"

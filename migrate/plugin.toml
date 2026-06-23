@@ -1,0 +1,40 @@
+# @investtal/proto-plugins — migrate (golang-migrate)
+#
+# Vendored proto TOML plugin for the golang-migrate database migration CLI.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from jamesukiyo/proto-plugins (migrate.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/golang-migrate/migrate
+# Integrity   : download-file checksum IS verified — upstream ships a standard
+#               `<sha256>  <file>` sha256sum.txt (checksum-url below).
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "migrate"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/golang-migrate/migrate"
+
+[platform.linux]
+download-file = "migrate.linux-{arch}.tar.gz"
+checksum-file = "sha256sum.txt"
+
+[platform.macos]
+download-file = "migrate.darwin-{arch}.tar.gz"
+checksum-file = "sha256sum.txt"
+
+[platform.windows]
+download-file = "migrate.windows-{arch}.zip"
+checksum-file = "sha256sum.txt"
+
+[install]
+download-url = "https://github.com/golang-migrate/migrate/releases/download/v{version}/{download_file}"
+checksum-url = "https://github.com/golang-migrate/migrate/releases/download/v{version}/{checksum_file}"
+
+[install.arch]
+aarch64 = "arm64"
+x86_64 = "amd64"
+x86 = "386"
