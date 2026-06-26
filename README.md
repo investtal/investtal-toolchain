@@ -1,4 +1,4 @@
-# proto-plugins
+# Investtal-toolchains
 
 Vendored, Investtal-owned [proto](https://moonrepo.dev/proto) toolchain plugins.
 
