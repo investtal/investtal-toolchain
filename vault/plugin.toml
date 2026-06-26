@@ -1,0 +1,45 @@
+# @investtal/proto-plugins — vault
+#
+# Vendored proto TOML plugin for HashiCorp Vault CLI.
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : hand-authored from releases.hashicorp.com/vault artifact listing
+# Audited     : 2026-06-23
+# Upstream    : https://releases.hashicorp.com/vault
+# Integrity   : download-file checksum IS verified — HashiCorp ships a standard
+#               `<sha256>  <file>` SHA256SUMS (checksum-url below).
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "vault"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/hashicorp/vault"
+
+[platform.linux]
+download-file = "vault_{version}_linux_{arch}.zip"
+checksum-file = "vault_{version}_SHA256SUMS"
+exe-path = "vault"
+
+[platform.macos]
+download-file = "vault_{version}_darwin_{arch}.zip"
+checksum-file = "vault_{version}_SHA256SUMS"
+exe-path = "vault"
+
+[platform.windows]
+download-file = "vault_{version}_windows_{arch}.zip"
+checksum-file = "vault_{version}_SHA256SUMS"
+exe-path = "vault.exe"
+
+[install]
+download-url = "https://releases.hashicorp.com/vault/{version}/{download_file}"
+checksum-url = "https://releases.hashicorp.com/vault/{version}/{checksum_file}"
+unpack = true
+
+[install.arch]
+x86 = "386"
+x86_64 = "amd64"
+aarch64 = "arm64"
+arm64 = "arm64"

@@ -1,0 +1,40 @@
+# @investtal/proto-plugins — shfmt
+#
+# Vendored proto TOML plugin for shfmt (shell formatter).
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from ageha734/proto-plugins (toml/shfmt.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/mvdan/sh
+# Integrity   : upstream ships no checksum file — binaries are single-file
+#               downloads (no archive), so no checksum-url is available.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "shfmt"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/mvdan/sh"
+
+[platform.linux]
+download-file = "shfmt_v{version}_linux_{arch}"
+bin-path = "shfmt"
+
+[platform.macos]
+download-file = "shfmt_v{version}_darwin_{arch}"
+bin-path = "shfmt"
+
+[platform.windows]
+download-file = "shfmt_v{version}_windows_{arch}.exe"
+bin-path = "shfmt.exe"
+
+[install]
+download-url = "https://github.com/mvdan/sh/releases/download/v{version}/{download_file}"
+unpack = false
+
+[install.arch]
+x86 = "386"
+x86_64 = "amd64"
+aarch64 = "arm64"

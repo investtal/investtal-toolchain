@@ -1,0 +1,42 @@
+# @investtal/proto-plugins — shellcheck
+#
+# Vendored proto TOML plugin for shellcheck (shell script static analysis).
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : forked from ageha734/proto-plugins (toml/shellcheck.toml)
+# Audited     : 2026-06-23
+# Upstream    : https://github.com/koalaman/shellcheck
+# Integrity   : upstream ships no checksum file — no checksum-url available.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "shellcheck"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/koalaman/shellcheck"
+
+[platform.linux]
+download-file = "shellcheck-v{version}.linux.{arch}.tar.xz"
+archive-prefix = "shellcheck-v{version}"
+bin-path = "shellcheck"
+
+[platform.macos]
+download-file = "shellcheck-v{version}.darwin.{arch}.tar.xz"
+archive-prefix = "shellcheck-v{version}"
+bin-path = "shellcheck"
+
+[platform.windows]
+download-file = "shellcheck-v{version}.zip"
+archive-prefix = "shellcheck-v{version}"
+bin-path = "shellcheck.exe"
+
+[install]
+download-url = "https://github.com/koalaman/shellcheck/releases/download/v{version}/{download_file}"
+unpack = true
+
+[install.arch]
+arm = "armv6hf"
+aarch64 = "aarch64"
+x86_64 = "x86_64"

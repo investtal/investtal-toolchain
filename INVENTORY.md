@@ -1,7 +1,7 @@
-# proto-plugins — inventory
+# investtal-toolchain — inventory
 
 Vendored, Investtal-owned proto toolchain plugins. Full rationale, integrity
-findings, and consumer instructions: [`docs/proto-plugins.md`](../../docs/proto-plugins.md).
+findings, and consumer instructions: [`docs/proto-plugins.md`](docs/proto-plugins.md).
 
 | Tool | File | Kind | Binary checksum | Audited |
 |------|------|------|-----------------|---------|
@@ -13,6 +13,10 @@ findings, and consumer instructions: [`docs/proto-plugins.md`](../../docs/proto-
 | yq | `yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum | 2026-06-23 |
 | openjdk | `openjdk/openjdk_adoptium_tool.wasm` | WASM | vendored binary, `.sha256` pinned | 2026-06-23 |
 | semgrep | `semgrep/requirements.txt` | PyPI | ✅ pip `--require-hashes` | 2026-06-23 |
+| shfmt | `shfmt/plugin.toml` | TOML | ❌ upstream ships no checksum file (single-file binary) | 2026-06-23 |
+| shellcheck | `shellcheck/plugin.toml` | TOML | ❌ upstream ships no aggregate checksum file | 2026-06-23 |
+| kubectl | `kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | 2026-06-23 |
+| vault | `vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | 2026-06-23 |
 
 All verified end-to-end with `proto 0.56.4`: each TOML plugin resolves versions,
 downloads, and (where supported) verifies the binary checksum; the openjdk WASM
