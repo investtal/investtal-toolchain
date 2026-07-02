@@ -1,0 +1,47 @@
+# @investtal/proto-plugins — netbird
+#
+# Vendored proto TOML plugin for the NetBird client CLI (WireGuard mesh VPN).
+# Owned + audited by Investtal so our toolchain never resolves a plugin from an
+# uncontrolled third-party repo.
+#
+# Provenance : hand-authored from github.com/netbirdio/netbird release assets
+# Audited     : 2026-07-02
+# Upstream    : https://github.com/netbirdio/netbird
+# Integrity   : download-file checksum IS verified — upstream ships a standard
+#               `<sha256>  <file>` netbird_{version}_checksums.txt (checksum-url).
+# Note        : replaces the pkgs.netbird.io/install.sh piped-to-shell install in
+#               base-toolschain — pins the exact release + verifies the archive.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "netbird"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/netbirdio/netbird"
+
+[platform.linux]
+download-file = "netbird_{version}_linux_{arch}.tar.gz"
+checksum-file = "netbird_{version}_checksums.txt"
+exe-path = "netbird"
+
+[platform.macos]
+download-file = "netbird_{version}_darwin_{arch}.tar.gz"
+checksum-file = "netbird_{version}_checksums.txt"
+exe-path = "netbird"
+
+[platform.windows]
+download-file = "netbird_{version}_windows_{arch}.tar.gz"
+checksum-file = "netbird_{version}_checksums.txt"
+exe-path = "netbird.exe"
+
+[install]
+download-url = "https://github.com/netbirdio/netbird/releases/download/v{version}/{download_file}"
+checksum-url = "https://github.com/netbirdio/netbird/releases/download/v{version}/{checksum_file}"
+unpack = true
+
+[install.arch]
+x86_64 = "amd64"
+x86 = "386"
+aarch64 = "arm64"
+arm64 = "arm64"
