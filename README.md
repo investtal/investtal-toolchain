@@ -95,9 +95,12 @@ Check installed version: `9cc version`.
 **Use:**
 ```sh
 9cc list                 # list models
+9cc list --json          # machine-readable registry (alias -> full id); consumed by fleet routing
 9cc run fable            # launch with cc/fable-5
 9cc run glm/glm-5.2      # full 9Router ID also works
 9cc run minimax --resume # extra args forwarded to claude
+9cc next minimax         # print cascade successor for a model (fleet healer advances on rate-limit)
+9cc next minimax --no-free # successor excluding the free pool
 9cc version              # print version
 ```
 In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5.2`).
