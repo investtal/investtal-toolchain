@@ -1,61 +1,73 @@
-# investtal-toolchain
+# investtal-toolchain — proto plugins
 
 Vendored, Investtal-owned [proto](https://moonrepo.dev/proto) toolchain plugins.
 
-This **public** repo is the **single canonical source** for every Investtal proto
-plugin. Private repos (e.g. `investtal-portals`, `devops-investtal`,
-`investtal-apis`) pin proto plugins to immutable, Investtal-audited definitions
-here over plain `https://` — instead of resolving them from uncontrolled
-third-party repos. proto loads a plugin's definition at install time and has
-**no checksum/lockfile for the plugin file itself**, so whoever controls the
-source repo controls our binary download path. Vendoring + commit-SHA pinning is
-the integrity control; each TOML plugin's `checksum-url` then verifies the
-downloaded binary.
+This is the **single canonical source** for every Investtal proto plugin. It is a
+**public** repo so private consumers (`investtal-portals`, `devops-investtal`,
+`investtal-apis`, …) can pin plugins over plain `https://` instead of resolving
+them from uncontrolled third-party repos.
 
-> Plugin definitions only point at public upstream release binaries — no secrets.
-> This repo is the one place the plugins live; consumers reference it by
-> commit-SHA-pinned raw URL.
+## Why this exists
+
+Our `.prototools` files previously resolved every non-builtin tool from an
+**uncontrolled third-party GitHub repo** (`ageha734`, `Phault`, `appthrust`,
+`jamesukiyo`, `eplightning`). proto loads a plugin's definition at install time,
+so whoever controls those repos controls what URL our CI/dev machines download a
+binary from. They can be force-pushed, deleted, transferred, or poisoned — and
+**proto has no checksum/lockfile for the plugin file itself**. That is a live
+supply-chain risk on a security-tooling install path.
+
+This repo forks each plugin into infrastructure we own and have audited so the
+toolchain only ever resolves plugins we control. Vendoring + commit-SHA pinning
+**is** the integrity control for the plugin definition; the per-tool
+`checksum-url` (below) then verifies the downloaded binary.
 
 ## Inventory
 
-| Tool | File | Kind | Binary checksum verified? |
-|------|------|------|---------------------------|
-| gitleaks | `gitleaks/plugin.toml` | TOML | ✅ `checksums.txt` |
-| migrate | `migrate/plugin.toml` | TOML | ✅ `sha256sum.txt` |
-| trivy | `trivy/plugin.toml` | TOML | ✅ `checksums.txt` |
-| gh | `gh/plugin.toml` | TOML | ✅ hardened (added `checksum-url`) |
-| gradle | `gradle/plugin.toml` | TOML | ✅ `.sha256` |
-| yq | `yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum |
-| openjdk | `openjdk/openjdk_adoptium_tool.wasm` (+ `.sha256`) | WASM | vendored binary, hash pinned |
-| semgrep | `semgrep/requirements.txt` | PyPI | ✅ pip `--require-hashes` (fully locked) |
-| shfmt | `shfmt/plugin.toml` | TOML | ❌ upstream ships no checksum file (single-file binary) |
-| shellcheck | `shellcheck/plugin.toml` | TOML | ❌ upstream ships no aggregate checksum file |
-| kubectl | `kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` exists but proto TOML cannot wire it |
-| vault | `vault/plugin.toml` | TOML | ✅ `SHA256SUMS` |
+All plugins live under `proto/`. Per-tool shape, checksum status, and upstream
+provenance are tracked in [`INVENTORY.md`](INVENTORY.md); full integrity findings
+and per-tool notes are in [`docs/proto-plugins.md`](docs/proto-plugins.md).
 
-See `INVENTORY.md` for audit dates and [`docs/proto-plugins.md`](docs/proto-plugins.md)
-for full rationale, integrity findings, and per-tool notes.
+| Tool | File | Kind | Binary checksum | Upstream forked from |
+|------|------|------|-----------------|----------------------|
+| gitleaks | `proto/gitleaks/plugin.toml` | TOML | ✅ `checksums.txt` | `Phault/proto-toml-plugins` |
+| migrate | `proto/migrate/plugin.toml` | TOML | ✅ `sha256sum.txt` | `jamesukiyo/proto-plugins` |
+| trivy | `proto/trivy/plugin.toml` | TOML | ✅ `checksums.txt` | `ageha734/proto-plugins` |
+| gh | `proto/gh/plugin.toml` | TOML | ✅ hardened (added `checksum-url`) | `appthrust/proto-toml-plugins` |
+| gradle | `proto/gradle/plugin.toml` | TOML | ✅ `.sha256` | `eplightning/openjdk-adoptium-proto-plugin` |
+| yq | `proto/yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum | `appthrust/proto-toml-plugins` |
+| openjdk | `proto/openjdk/openjdk_adoptium_tool.wasm` (+ `.sha256`) | WASM | vendored binary, hash pinned | `eplightning/openjdk-adoptium-proto-plugin` |
+| semgrep | `proto/semgrep/requirements.txt` | PyPI | ✅ `--require-hashes` | n/a (not a proto plugin) |
+| shfmt | `proto/shfmt/plugin.toml` | TOML | ❌ single-file binary, no checksum file | `ageha734/proto-plugins` |
+| shellcheck | `proto/shellcheck/plugin.toml` | TOML | ❌ no aggregate checksum file | `ageha734/proto-plugins` |
+| kubectl | `proto/kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` unwirable in TOML | `ageha734/proto-plugins` |
+| vault | `proto/vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | hand-authored from `releases.hashicorp.com` |
+| netbird | `proto/netbird/plugin.toml` | TOML | n/a vendored CLI plugin definition | `netbirdio/netbird` |
 
-## Usage
+## Consuming the plugins
 
-Pin to an immutable commit SHA (never a branch — a branch ref lets anyone with
-push access silently change the download):
+proto locators ([docs](https://moonrepo.dev/docs/proto/non-wasm-plugin)) — always
+commit-SHA-pinned raw URLs against this public repo (immutable; a branch ref
+would let anyone with push access silently change the download):
 
 ```toml
 [plugins.tools]
-gitleaks = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/gitleaks/plugin.toml"
-openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/openjdk/openjdk_adoptium_tool.wasm"
+gitleaks = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/gitleaks/plugin.toml"
+openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/openjdk/openjdk_adoptium_tool.wasm"
 ```
 
-semgrep is not a proto plugin (PyPI-only); install its lockfile with:
+> Never reference the original third-party repos again. Never use an unpinned
+> `github://` or branch URL for these — that re-introduces the risk this repo
+> removes.
 
-```bash
-pip install --require-hashes -r <path>/semgrep/requirements.txt
-```
+## Updating a plugin
 
-## Updating
-
-1. Make the change here, verify with `proto install <tool>` against a `file://`
-   locator (confirm the install log shows `Verifying checksum against …`).
-2. Commit.
-3. Bump the pinned commit SHA in every consumer `.prototools`.
+1. Diff the upstream plugin against ours; copy only intended changes.
+2. Confirm release asset + checksum filenames still match (GitHub API
+   `/releases/latest`).
+3. `proto install <tool>` in a scratch dir against a `file://` locator;
+   confirm the install log shows `Verifying checksum against …`.
+4. For openjdk: re-download the `.wasm`, recompute `.sha256`, confirm it equals
+   GitHub's server-side asset digest.
+5. For semgrep: bump version, re-resolve hashes from PyPI.
+6. Commit, then bump the pinned commit SHA in every consumer `.prototools`.

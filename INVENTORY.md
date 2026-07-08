@@ -5,18 +5,19 @@ findings, and consumer instructions: [`docs/proto-plugins.md`](docs/proto-plugin
 
 | Tool | File | Kind | Binary checksum | Audited |
 |------|------|------|-----------------|---------|
-| gitleaks | `gitleaks/plugin.toml` | TOML | ✅ `checksums.txt` | 2026-06-23 |
-| migrate | `migrate/plugin.toml` | TOML | ✅ `sha256sum.txt` | 2026-06-23 |
-| trivy | `trivy/plugin.toml` | TOML | ✅ `checksums.txt` | 2026-06-23 |
-| gh | `gh/plugin.toml` | TOML | ✅ hardened (added `checksum-url`) | 2026-06-23 |
-| gradle | `gradle/plugin.toml` | TOML | ✅ `.sha256` | 2026-06-23 |
-| yq | `yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum | 2026-06-23 |
-| openjdk | `openjdk/openjdk_adoptium_tool.wasm` | WASM | vendored binary, `.sha256` pinned | 2026-06-23 |
-| semgrep | `semgrep/requirements.txt` | PyPI | ✅ pip `--require-hashes` | 2026-06-23 |
-| shfmt | `shfmt/plugin.toml` | TOML | ❌ upstream ships no checksum file (single-file binary) | 2026-06-23 |
-| shellcheck | `shellcheck/plugin.toml` | TOML | ❌ upstream ships no aggregate checksum file | 2026-06-23 |
-| kubectl | `kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | 2026-06-23 |
-| vault | `vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | 2026-06-23 |
+| gitleaks | `proto/gitleaks/plugin.toml` | TOML | ✅ `checksums.txt` | 2026-06-23 |
+| migrate | `proto/migrate/plugin.toml` | TOML | ✅ `sha256sum.txt` | 2026-06-23 |
+| trivy | `proto/trivy/plugin.toml` | TOML | ✅ `checksums.txt` | 2026-06-23 |
+| gh | `proto/gh/plugin.toml` | TOML | ✅ hardened (added `checksum-url`) | 2026-06-23 |
+| gradle | `proto/gradle/plugin.toml` | TOML | ✅ `.sha256` | 2026-06-23 |
+| yq | `proto/yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum | 2026-06-23 |
+| openjdk | `proto/openjdk/openjdk_adoptium_tool.wasm` | WASM | vendored binary, `.sha256` pinned | 2026-06-23 |
+| semgrep | `proto/semgrep/requirements.txt` | PyPI | ✅ pip `--require-hashes` | 2026-06-23 |
+| shfmt | `proto/shfmt/plugin.toml` | TOML | ❌ upstream ships no checksum file (single-file binary) | 2026-06-23 |
+| shellcheck | `proto/shellcheck/plugin.toml` | TOML | ❌ upstream ships no aggregate checksum file | 2026-06-23 |
+| kubectl | `proto/kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | 2026-06-23 |
+| vault | `proto/vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | 2026-06-23 |
+| netbird | `proto/netbird/plugin.toml` | TOML | n/a (vendored CLI plugin definition) | 2026-07-08 |
 
 All verified end-to-end with `proto 0.56.4`: each TOML plugin resolves versions,
 downloads, and (where supported) verifies the binary checksum; the openjdk WASM

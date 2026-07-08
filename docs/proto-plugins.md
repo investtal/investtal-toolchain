@@ -26,18 +26,19 @@ toolchain only ever resolves plugins we control. Vendoring + commit-SHA pinning
 
 | Tool | Shape | Vendored as | Binary checksum verified? | Upstream forked from |
 |------|-------|-------------|---------------------------|----------------------|
-| gitleaks | TOML | `gitleaks/plugin.toml` | ✅ yes (`checksums.txt`) | `Phault/proto-toml-plugins` |
-| migrate | TOML | `migrate/plugin.toml` | ✅ yes (`sha256sum.txt`) | `jamesukiyo/proto-plugins` |
-| trivy | TOML | `trivy/plugin.toml` | ✅ yes (`checksums.txt`) | `ageha734/proto-plugins` |
-| gh | TOML | `gh/plugin.toml` | ✅ **hardened** — added missing `checksum-url` | `appthrust/proto-toml-plugins` |
-| gradle | TOML | `gradle/plugin.toml` | ✅ yes (`.sha256`) | `eplightning/openjdk-adoptium-proto-plugin` |
-| yq | TOML | `yq/plugin.toml` | ❌ not possible — see note | `appthrust/proto-toml-plugins` |
-| openjdk | **WASM** | `openjdk/openjdk_adoptium_tool.wasm` (+ `.sha256`) | n/a (binary vendored) | `eplightning/openjdk-adoptium-proto-plugin` |
-| semgrep | **PyPI only** | `semgrep/requirements.txt` (hash-pinned) | ✅ pip `--require-hashes` | n/a (not a proto plugin) |
-| shfmt | TOML | `shfmt/plugin.toml` | ❌ no checksum file (single-file binary) | `ageha734/proto-plugins` |
-| shellcheck | TOML | `shellcheck/plugin.toml` | ❌ no aggregate checksum file | `ageha734/proto-plugins` |
-| kubectl | TOML | `kubectl/plugin.toml` | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | `ageha734/proto-plugins` |
-| vault | TOML | `vault/plugin.toml` | ✅ yes (`SHA256SUMS`) | hand-authored from `releases.hashicorp.com` |
+| gitleaks | TOML | `proto/gitleaks/plugin.toml` | ✅ yes (`checksums.txt`) | `Phault/proto-toml-plugins` |
+| migrate | TOML | `proto/migrate/plugin.toml` | ✅ yes (`sha256sum.txt`) | `jamesukiyo/proto-plugins` |
+| trivy | TOML | `proto/trivy/plugin.toml` | ✅ yes (`checksums.txt`) | `ageha734/proto-plugins` |
+| gh | TOML | `proto/gh/plugin.toml` | ✅ **hardened** — added missing `checksum-url` | `appthrust/proto-toml-plugins` |
+| gradle | TOML | `proto/gradle/plugin.toml` | ✅ yes (`.sha256`) | `eplightning/openjdk-adoptium-proto-plugin` |
+| yq | TOML | `proto/yq/plugin.toml` | ❌ not possible — see note | `appthrust/proto-toml-plugins` |
+| openjdk | **WASM** | `proto/openjdk/openjdk_adoptium_tool.wasm` (+ `.sha256`) | n/a (binary vendored) | `eplightning/openjdk-adoptium-proto-plugin` |
+| semgrep | **PyPI only** | `proto/semgrep/requirements.txt` (hash-pinned) | ✅ pip `--require-hashes` | n/a (not a proto plugin) |
+| shfmt | TOML | `proto/shfmt/plugin.toml` | ❌ no checksum file (single-file binary) | `ageha734/proto-plugins` |
+| shellcheck | TOML | `proto/shellcheck/plugin.toml` | ❌ no aggregate checksum file | `ageha734/proto-plugins` |
+| kubectl | TOML | `proto/kubectl/plugin.toml` | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | `ageha734/proto-plugins` |
+| vault | TOML | `proto/vault/plugin.toml` | ✅ yes (`SHA256SUMS`) | hand-authored from `releases.hashicorp.com` |
+| netbird | TOML | `proto/netbird/plugin.toml` | n/a (vendored CLI plugin definition) | `netbirdio/netbird` |
 
 ## Per-tool notes
 
@@ -68,7 +69,7 @@ server-side asset digest and a local recompute both confirm the real hash is:
 4d16394d0205581112e79a302e57b6fffb7c762190f9d2c725d4d9a31b4a5120  openjdk_adoptium_tool.wasm
 ```
 
-We record + trust **our** verified hash in `openjdk/openjdk_adoptium_tool.wasm.sha256`.
+We record + trust **our** verified hash in `proto/openjdk/openjdk_adoptium_tool.wasm.sha256`.
 Re-verify any time:
 
 ```bash
@@ -78,10 +79,10 @@ cd openjdk && shasum -a 256 -c openjdk_adoptium_tool.wasm.sha256
 ### semgrep — not a proto plugin
 semgrep ships no standalone GitHub-release binary (PyPI wheels/sdist only, needs
 Python). It cannot be a proto CLI plugin. The controllable equivalent is the
-hash-pinned `semgrep/requirements.txt`, installed with:
+hash-pinned `proto/semgrep/requirements.txt`, installed with:
 
 ```bash
-pip install --require-hashes -r semgrep/requirements.txt
+pip install --require-hashes -r proto/semgrep/requirements.txt
 ```
 
 `scripts/security-gate.sh` in each consumer invokes semgrep; install it this way
@@ -108,8 +109,8 @@ would let anyone with push access silently change the download):
 
 ```toml
 [plugins.tools]
-gitleaks = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/gitleaks/plugin.toml"
-openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/openjdk/openjdk_adoptium_tool.wasm"
+gitleaks = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/gitleaks/plugin.toml"
+openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/openjdk/openjdk_adoptium_tool.wasm"
 ```
 
 > Never reference the original third-party repos again. Never use an unpinned
