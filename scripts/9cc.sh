@@ -42,6 +42,9 @@ cascade_for() {
 # ponytail: cascade hardcoded flat; extract to models.json when >2 tiers
 next_model() {
     local current="$1"; shift
+    # Accept both aliases (opus) and full IDs (cc/claude-opus-4-8); cascade chains
+    # store full IDs, so resolve before walking.
+    local props; if props="$(get_model "$current")"; then current="${props%%|*}"; fi
     local allow_free=1
     [ "${1:-}" = "--no-free" ] && allow_free=0
     local chain; chain="$(cascade_for opus)"

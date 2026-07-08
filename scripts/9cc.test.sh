@@ -119,6 +119,11 @@ if next_model 'nope/model' >/dev/null 2>&1; then echo "  FAIL: unknown should ex
 echo "Cycle 12: next subcommand wraps next_model"
 assert_match "^cx/gpt-5.5-high$" "$("$CC" next cc/claude-opus-4-8)" "9cc next subcommand"
 
+echo "Cycle 12b: next_model resolves alias -> full id before walking chain"
+assert_eq "$(next_model opus)" "cx/gpt-5.5-high" "next accepts alias 'opus'"
+# glm5 -> glm/glm-5.2 is NOT on any cascade chain (chain has glm/glm-5.2-MAX) -> exhausted
+if next_model glm5 >/dev/null 2>&1; then echo "  FAIL: off-chain alias should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: off-chain alias exits 1"; PASS=$((PASS+1)); fi
+
 echo "Cycle 13: list --json is valid JSON, 13 entries, correct shape"
 JSON="$("$CC" list --json)"
 echo "$JSON" | node -e '

@@ -35,6 +35,9 @@ function Get-Cascade { param([ValidateSet('opus','free')][string]$Tier)
 }
 
 function Get-NextModel { param([string]$Current,[switch]$NoFree)
+    # Accept alias or full id; cascade chains store full IDs, so resolve first.
+    $resolved = Get-Model $Current
+    if ($resolved) { $Current = $resolved.Id }
     $chain = @(Get-Cascade 'opus')
     if (-not $NoFree) { $chain += @(Get-Cascade 'free') }
     $found = $false
@@ -97,7 +100,7 @@ function Invoke-Session { param([string]$Key,[string[]]$ExtraArgs)
 if (-not $DotSource) {
     if ($args.Count -eq 0) { Show-Help; return }
     switch ($args[0]) {
-        'list' { List-Models -Json:($args[1] -eq '--json') }
+        'list' { List-Models -Json:($args -contains '--json') }
         'next' { if ($args.Count -lt 2) { Write-Error "9cc: missing current model"; exit 1 }
                  try { Get-NextModel $args[1] -NoFree:($args -contains '--no-free') } catch { Write-Error $_.Exception.Message; exit 1 } }
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
