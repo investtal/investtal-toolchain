@@ -71,3 +71,37 @@ openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COM
    GitHub's server-side asset digest.
 5. For semgrep: bump version, re-resolve hashes from PyPI.
 6. Commit, then bump the pinned commit SHA in every consumer `.prototools`.
+
+## 9cc — Claude Code model switcher
+
+Launch Claude Code with a dynamic model over the 9Router gateway. Reads auth from
+`~/.claude/settings.json` (read-only — never mutates it).
+
+**Install (mac/linux/wsl):**
+```sh
+curl -fsSL https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.1.0/scripts/install.sh | bash
+```
+**Install (windows, PowerShell):**
+```powershell
+powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.1.0/scripts/install.ps1 | iex"
+```
+Pin a specific version or commit SHA via `CC9_VERSION`:
+```sh
+curl -fsSL .../install.sh | CC9_VERSION=v0.1.0 bash        # version tag
+curl -fsSL .../install.sh | CC9_VERSION=<full-commit-sha> bash  # exact commit (immutable)
+```
+Check installed version: `9cc version`.
+
+**Use:**
+```sh
+9cc list                 # list models
+9cc run fable            # launch with cc/fable-5
+9cc run glm/glm-5.2      # full 9Router ID also works
+9cc run minimax --resume # extra args forwarded to claude
+9cc version              # print version
+```
+In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5.2`).
+
+Full design: [`docs/ideas/0002-ManageClaudeCodeCLI.spec.md`](docs/ideas/0002-ManageClaudeCodeCLI.spec.md).
+Implementation plan: [`docs/plans/2026-07-08-9cc-model-switcher.md`](docs/plans/2026-07-08-9cc-model-switcher.md).
+Overnight auto-pilot is deferred to a follow-up.
