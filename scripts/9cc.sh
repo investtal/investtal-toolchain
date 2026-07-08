@@ -71,6 +71,22 @@ EOF
 }
 
 list_models() {
+    if [ "${1:-}" = "--json" ]; then
+        # Machine-readable registry (fleet consumes this). node emits JSON; avoids
+        # hand-rolling array/quote escaping. 9cc requires node anyway (read_setting).
+        local entries="" a id win rest
+        for row in \
+            "fable|cc/fable-5|200000" "opus|cc/claude-opus-4-8|200000" "sonnet|cc/claude-sonnet-5|200000" \
+            "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
+            "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
+            "kimi|kimi/kimi-k2.7|1000000" "grok|gc/grok-build|500000" "grokcomposer|gc/grok-composer-2.5-fast|500000" \
+            "minimax|minimax/MiniMax-M3|1000000"; do
+            a="${row%%|*}"; rest="${row#*|}"; id="${rest%%|*}"; win="${rest##*|}"
+            entries="${entries}{\"alias\":\"$a\",\"id\":\"$id\",\"window\":$win},"
+        done
+        printf '[%s]\n' "${entries%,}"
+        return
+    fi
     printf '%-14s %-32s %s\n' "ALIAS" "9ROUTER_ID" "WINDOW"
     local a id win rest
     for row in \
@@ -117,7 +133,7 @@ run_session() {
 
 main() {
     case "${1:-help}" in
-        list) list_models ;;
+        list) shift || true; list_models "$@" ;;
         run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
         next) shift || true; [ "${1:-}" ] || { echo "9cc: missing current model. Usage: 9cc next <id> [--no-free]" >&2; return 1; }; local s; s="$(next_model "$@")" || { echo "9cc: no successor for '$1'" >&2; return 1; }; printf '%s\n' "$s" ;;
         version|-v|--version) echo "9cc $CC9_VERSION" ;;

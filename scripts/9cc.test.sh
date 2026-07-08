@@ -119,6 +119,17 @@ if next_model 'nope/model' >/dev/null 2>&1; then echo "  FAIL: unknown should ex
 echo "Cycle 12: next subcommand wraps next_model"
 assert_match "^cx/gpt-5.5-high$" "$("$CC" next cc/claude-opus-4-8)" "9cc next subcommand"
 
+echo "Cycle 13: list --json is valid JSON, 13 entries, correct shape"
+JSON="$("$CC" list --json)"
+echo "$JSON" | node -e '
+    const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
+    if (!Array.isArray(d) || d.length !== 13) { console.error("FAIL: want 13 entries, got", d.length); process.exit(1); }
+    const f = d.find(x => x.alias === "fable");
+    if (!f || f.id !== "cc/fable-5" || f.window !== 200000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
+    if (!d.every(x => typeof x.window === "number")) { console.error("FAIL: window not numeric"); process.exit(1); }
+    console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
+' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
