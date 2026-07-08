@@ -49,6 +49,21 @@ Write-Host "  ok: re-run ok"; $script:Pass++
 Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 Remove-Item Env:CC9_SOURCE,Env:CC9_HOME,Env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 
+Write-Host "Cycle 6: cascade tiers"
+$opus = Get-Cascade 'opus'
+if ($opus.Count -eq 3 -and $opus[0] -eq 'cc/claude-opus-4-8') { Write-Host "  ok: opus chain"; $script:Pass++ } else { Write-Host "  FAIL opus: $($opus -join ' ')"; $script:Fail++ }
+$free = Get-Cascade 'free'
+if ($free.Count -eq 10) { Write-Host "  ok: free 10"; $script:Pass++ } else { Write-Host "  FAIL free count $($free.Count)"; $script:Fail++ }
+
+Write-Host "Cycle 7: Get-NextModel walks + exhausts"
+if ((Get-NextModel 'cc/claude-opus-4-8') -eq 'cx/gpt-5.5-high') { Write-Host "  ok: next opus"; $script:Pass++ } else { Write-Host "  FAIL next opus"; $script:Fail++ }
+$ex = $null; try { Get-NextModel 'openrouter/nousresearch/hermes-3-llama-3.1-405b:free' -ErrorAction Stop } catch { $ex = $_ }
+if ($null -ne $ex) { Write-Host "  ok: exhausted throws"; $script:Pass++ } else { Write-Host "  FAIL: exhausted should throw"; $script:Fail++ }
+
+Write-Host "Cycle 8: List-Models -Json"
+$j = List-Models -Json | ConvertFrom-Json
+if ($j.Count -eq 13 -and $j[0].alias -eq 'fable') { Write-Host "  ok: json 13"; $script:Pass++ } else { Write-Host "  FAIL json"; $script:Fail++ }
+
 Write-Host "----"
 Write-Host "PASS=$script:Pass FAIL=$script:Fail"
 if ($script:Fail -ne 0) { exit 1 }

@@ -29,6 +29,19 @@ function Get-Model { param([string]$Key)
     return $null
 }
 
+function Get-Cascade { param([ValidateSet('opus','free')][string]$Tier)
+    if ($Tier -eq 'opus') { return @('cc/claude-opus-4-8','cx/gpt-5.5-high','glm/glm-5.2-max') }
+    return @('openrouter/poolside/laguna-xs-2.1:free','openrouter/nvidia/nemotron-3-ultra-550b-a55b:free','openrouter/nvidia/nemotron-3.5-content-safety:free','openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free','openrouter/google/gemma-4-26b-a4b-it:free','openrouter/nvidia/nemotron-3-super-120b-a12b:free','openrouter/qwen/qwen3-next-80b-a3b-instruct:free','openrouter/openai/gpt-oss-120b:free','openrouter/qwen/qwen3-coder:free','openrouter/nousresearch/hermes-3-llama-3.1-405b:free')
+}
+
+function Get-NextModel { param([string]$Current,[switch]$NoFree)
+    $chain = @(Get-Cascade 'opus')
+    if (-not $NoFree) { $chain += @(Get-Cascade 'free') }
+    $found = $false
+    foreach ($m in $chain) { if ($found) { return $m }; if ($m -eq $Current) { $found = $true } }
+    throw "9cc: no successor for '$Current'"
+}
+
 function Show-Help {
     Write-Host "9cc - Claude Code model switcher over 9Router"
     Write-Host "Usage:"
@@ -41,6 +54,12 @@ function Show-Help {
 }
 
 function List-Models {
+    param([switch]$Json)
+    if ($Json) {
+        $rows = foreach ($k in $Script:ModelMap.Keys) { $v = $Script:ModelMap[$k]; [pscustomobject]@{alias=$k;id=$v.Id;window=[int]$v.Window} }
+        $rows | ConvertTo-Json -Compress
+        return
+    }
     "{0,-14} {1,-32} {2}" -f 'ALIAS','9ROUTER_ID','WINDOW'
     foreach ($k in $Script:ModelMap.Keys) { $v = $Script:ModelMap[$k]; "{0,-14} {1,-32} {2}" -f $k,$v.Id,$v.Window }
 }
@@ -78,7 +97,9 @@ function Invoke-Session { param([string]$Key,[string[]]$ExtraArgs)
 if (-not $DotSource) {
     if ($args.Count -eq 0) { Show-Help; return }
     switch ($args[0]) {
-        'list' { List-Models }
+        'list' { List-Models -Json:([bool]$args[1]) }
+        'next' { if ($args.Count -lt 2) { Write-Error "9cc: missing current model"; exit 1 }
+                 try { Get-NextModel $args[1] -NoFree:($args -contains '--no-free') } catch { Write-Error $_.Exception.Message; exit 1 } }
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
         'run'  { if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id>"; exit 1 }
                  Invoke-Session -Key $args[1] -ExtraArgs ($args | Select-Object -Skip 2) }
