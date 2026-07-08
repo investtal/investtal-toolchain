@@ -54,6 +54,10 @@ done
 echo "Cycle 5: run with no model exits 1"
 if "$CC" run >/dev/null 2>&1; then echo "  FAIL: run-no-arg should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: run-no-arg exits 1"; PASS=$((PASS+1)); fi
 
+echo "Cycle 5b: version prints 9cc <ver>"
+assert_match "^9cc " "$("$CC" version)" "version prints 9cc <ver>"
+assert_match "^9cc " "$("$CC" --version)" "version flag alias"
+
 echo "Cycle 6: run sets env vars + forwards args (claude stubbed)"
 mkdir -p /tmp/9cc-test-bin
 cat > /tmp/9cc-test-bin/claude <<'STUB'

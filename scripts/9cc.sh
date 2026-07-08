@@ -4,6 +4,7 @@
 # Usage: 9cc list | 9cc run <alias-or-id> [claude args...] | 9cc help
 set -euo pipefail
 
+CC9_VERSION="${CC9_VERSION:-0.1.0-dev}"
 CLAUDE_SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 
 # get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.
@@ -32,6 +33,7 @@ show_help() {
 Usage:
   9cc list                       List supported models
   9cc run <alias|id> [args...]   Launch claude with that model (extra args forwarded)
+  9cc version                    Print version
   9cc help                       Show this help
 Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax
 In-session: type /model <id> (e.g. /model glm/glm-5.2) to switch without restarting.
@@ -86,6 +88,7 @@ main() {
     case "${1:-help}" in
         list) list_models ;;
         run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
+        version|-v|--version) echo "9cc $CC9_VERSION" ;;
         help|-h|--help) show_help ;;
         *) echo "9cc: unknown command '$1'. Run '9cc help'." >&2; return 1 ;;
     esac

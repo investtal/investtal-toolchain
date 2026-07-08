@@ -4,6 +4,7 @@
 [CmdletBinding()]
 param([switch]$DotSource)
 $ErrorActionPreference = 'Stop'
+$9ccVersion = if ($env:CC9_VERSION) { $env:CC9_VERSION } else { '0.1.0-dev' }
 $SettingsPath = if ($env:CLAUDE_SETTINGS) { $env:CLAUDE_SETTINGS } else { Join-Path ([System.Environment]::GetFolderPath('UserProfile')) '.claude\settings.json' }
 
 $Script:ModelMap = [ordered]@{
@@ -33,6 +34,7 @@ function Show-Help {
     Write-Host "Usage:"
     Write-Host "  9cc.ps1 list                    List supported models"
     Write-Host "  9cc.ps1 run <alias|id> [args]   Launch claude with that model (extra args forwarded)"
+    Write-Host "  9cc.ps1 version                 Print version"
     Write-Host "  9cc.ps1 help                    Show this help"
     Write-Host "Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax"
     Write-Host "In-session: type /model <id> (e.g. /model glm/glm-5.2) to switch without restarting."
@@ -70,6 +72,7 @@ if (-not $DotSource) {
     if ($args.Count -eq 0) { Show-Help; return }
     switch ($args[0]) {
         'list' { List-Models }
+        { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
         'run'  { if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id>"; exit 1 }
                  Invoke-Session -Key $args[1] -ExtraArgs ($args | Select-Object -Skip 2) }
         { $_ -in 'help','-h','--help' } { Show-Help }

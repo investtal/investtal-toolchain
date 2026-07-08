@@ -79,13 +79,18 @@ Launch Claude Code with a dynamic model over the 9Router gateway. Reads auth fro
 
 **Install (mac/linux/wsl):**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.1.0/scripts/install.sh | bash
 ```
 **Install (windows, PowerShell):**
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/scripts/install.ps1 | iex"
+powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.1.0/scripts/install.ps1 | iex"
 ```
-> Pin the `<COMMIT_SHA>` for the same immutability reason as the proto plugins above.
+Pin a specific version or commit SHA via `CC9_VERSION`:
+```sh
+curl -fsSL .../install.sh | CC9_VERSION=v0.1.0 bash        # version tag
+curl -fsSL .../install.sh | CC9_VERSION=<full-commit-sha> bash  # exact commit (immutable)
+```
+Check installed version: `9cc version`.
 
 **Use:**
 ```sh
@@ -93,6 +98,7 @@ powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolcha
 9cc run fable            # launch with cc/fable-5
 9cc run glm/glm-5.2      # full 9Router ID also works
 9cc run minimax --resume # extra args forwarded to claude
+9cc version              # print version
 ```
 In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5.2`).
 
