@@ -97,6 +97,28 @@ bash "$DIR/install.sh" >>/tmp/9cc-install.log 2>&1 && { echo "  ok: re-run idemp
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR" /tmp/9cc-install.log
 unset CC9_SOURCE CC9_HOME CC9_BIN_DIR
 
+echo "Cycle 8: cascade_for tiers"
+assert_eq "$(cascade_for opus)" "cc/claude-opus-4-8 cx/gpt-5.5-high glm/glm-5.2-max" "opus fallback chain"
+assert_eq "$(cascade_for free | wc -w | tr -d ' ')" "10" "free cascade has 10 models"
+assert_eq "$(cascade_for free | head -c 38)" "openrouter/poolside/laguna-xs-2.1:free" "free[0]"
+
+echo "Cycle 9: next_model walks opus chain then exits"
+assert_eq "$(next_model 'cc/claude-opus-4-8')"        "cx/gpt-5.5-high" "next after opus"
+assert_eq "$(next_model 'cx/gpt-5.5-high')"           "glm/glm-5.2-max" "next after gpt"
+assert_eq "$(next_model 'glm/glm-5.2-max')"           "openrouter/poolside/laguna-xs-2.1:free" "next chains into free"
+assert_eq "$(next_model 'openrouter/nousresearch/hermes-3-llama-3.1-405b:free')" "" "last free -> empty (exit 1)"
+if next_model 'openrouter/nousresearch/hermes-3-llama-3.1-405b:free' >/dev/null 2>&1; then echo "  FAIL: exhausted should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: exhausted exits 1"; PASS=$((PASS+1)); fi
+
+echo "Cycle 10: next_model --no-free stops at paid boundary"
+assert_eq "$(next_model 'glm/glm-5.2-max' --no-free)" "" "--no-free: no free successor"
+if next_model 'glm/glm-5.2-max' --no-free >/dev/null 2>&1; then echo "  FAIL: --no-free at boundary should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: --no-free exits 1 at boundary"; PASS=$((PASS+1)); fi
+
+echo "Cycle 11: next_model unknown current -> exit 1"
+if next_model 'nope/model' >/dev/null 2>&1; then echo "  FAIL: unknown should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: unknown exits 1"; PASS=$((PASS+1)); fi
+
+echo "Cycle 12: next subcommand wraps next_model"
+assert_match "^cx/gpt-5.5-high$" "$("$CC" next cc/claude-opus-4-8)" "9cc next subcommand"
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

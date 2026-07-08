@@ -27,12 +27,42 @@ get_model() {
     esac
 }
 
+# Tiered cascade chains (spec §8 OPUS_FALLBACK + §9 FREE_CASCADE). 9cc is the single
+# source of model truth; the fleet healer asks `9cc next` to advance through these.
+cascade_for() {
+    case "$1" in
+        opus) echo "cc/claude-opus-4-8 cx/gpt-5.5-high glm/glm-5.2-max" ;;
+        free) echo "openrouter/poolside/laguna-xs-2.1:free openrouter/nvidia/nemotron-3-ultra-550b-a55b:free openrouter/nvidia/nemotron-3.5-content-safety:free openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free openrouter/google/gemma-4-26b-a4b-it:free openrouter/nvidia/nemotron-3-super-120b-a12b:free openrouter/qwen/qwen3-next-80b-a3b-instruct:free openrouter/openai/gpt-oss-120b:free openrouter/qwen/qwen3-coder:free openrouter/nousresearch/hermes-3-llama-3.1-405b:free" ;;
+        *) return 1 ;;
+    esac
+}
+
+# next_model <current> [--no-free] -> echo successor ID; exit 1 if none / unknown.
+# Walks opus chain first, then the free cascade (unless --no-free). Unknown current -> exit 1.
+# ponytail: cascade hardcoded flat; extract to models.json when >2 tiers
+next_model() {
+    local current="$1"; shift
+    local allow_free=1
+    [ "${1:-}" = "--no-free" ] && allow_free=0
+    local chain; chain="$(cascade_for opus)"
+    [ "$allow_free" = "1" ] && chain="$chain $(cascade_for free)"
+    local found=0 succ=""
+    local m
+    for m in $chain; do
+        if [ "$found" = "1" ]; then succ="$m"; break; fi
+        [ "$m" = "$current" ] && found=1
+    done
+    [ -n "$succ" ] || return 1
+    printf '%s' "$succ"
+}
+
 show_help() {
     cat <<'EOF'
 9cc — Claude Code model switcher over 9Router
 Usage:
   9cc list                       List supported models
   9cc run <alias|id> [args...]   Launch claude with that model (extra args forwarded)
+  9cc next <id> [--no-free]      Print the next model in the cascade
   9cc version                    Print version
   9cc help                       Show this help
 Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax
@@ -89,6 +119,7 @@ main() {
     case "${1:-help}" in
         list) list_models ;;
         run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
+        next) shift || true; [ "${1:-}" ] || { echo "9cc: missing current model. Usage: 9cc next <id> [--no-free]" >&2; return 1; }; local s; s="$(next_model "$@")" || { echo "9cc: no successor for '$1'" >&2; return 1; }; printf '%s\n' "$s" ;;
         version|-v|--version) echo "9cc $CC9_VERSION" ;;
         help|-h|--help) show_help ;;
         *) echo "9cc: unknown command '$1'. Run '9cc help'." >&2; return 1 ;;
