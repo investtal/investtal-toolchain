@@ -67,6 +67,7 @@ read_setting() {
 }
 
 run_session() {
+    command -v claude >/dev/null 2>&1 || { echo "9cc: claude command not found. Please install Claude Code first." >&2; return 1; }
     local key="$1"; shift || true
     local props; props="$(get_model "$key")" || { echo "9cc: unknown model '$key'. Run '9cc list'." >&2; return 1; }
     local id="${props%%|*}"; local win="${props##*|}"

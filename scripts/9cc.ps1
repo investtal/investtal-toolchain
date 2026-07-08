@@ -47,13 +47,20 @@ function List-Models {
 
 function Read-Setting { param([string]$Name)
     if (-not (Test-Path $SettingsPath)) { throw "9cc: settings not found at $SettingsPath" }
-    $cfg = Get-Content -Raw $SettingsPath | ConvertFrom-Json
+    $cfg = try {
+        Get-Content -Raw $SettingsPath -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        throw "9cc: failed to read or parse settings.json at $SettingsPath. Ensure it is valid JSON."
+    }
     $val = $cfg.env.$Name
     if (-not $val) { throw "9cc: '$Name' not found in $SettingsPath env block" }
     return $val
 }
 
 function Invoke-Session { param([string]$Key,[string[]]$ExtraArgs)
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        Write-Error "9cc: 'claude' command not found. Please install Claude Code first."; exit 1
+    }
     $m = Get-Model $Key
     if (-not $m) { Write-Error "9cc: unknown model '$Key'. Run '9cc.ps1 list'."; exit 1 }
     $env:CLAUDE_SETTINGS = $SettingsPath
