@@ -72,8 +72,8 @@ EOF
 
 list_models() {
     if [ "${1:-}" = "--json" ]; then
-        # Machine-readable registry (fleet consumes this). node emits JSON; avoids
-        # hand-rolling array/quote escaping. 9cc requires node anyway (read_setting).
+        # Machine-readable registry (fleet consumes this). Hand-built JSON: registry
+        # IDs/aliases contain no quote/backslash chars, so no escaping needed.
         local entries="" a id win rest
         for row in \
             "fable|cc/fable-5|200000" "opus|cc/claude-opus-4-8|200000" "sonnet|cc/claude-sonnet-5|200000" \
