@@ -200,6 +200,29 @@ read_setting() {
     printf '%s' "$v"
 }
 
+# Family-aware DEFAULT_{OPUS,SONNET,HAIKU} tiers for Claude Code internal routing.
+# Claude: OPUS=fable when selected fable else opus; SONNET=sonnet; HAIKU=haiku.
+# Grok: OPUS+SONNET=grok-4.5; HAIKU=composer.
+# Else: all three = selected id.
+tier_defaults() {
+    local id="$1"
+    case "$id" in
+        cc/claude-fable-5|cc/claude-opus-4-8|cc/claude-sonnet-5|cc/claude-haiku-4-5-20251001)
+            if [ "$id" = "cc/claude-fable-5" ]; then
+                printf '%s' "cc/claude-fable-5|cc/claude-sonnet-5|cc/claude-haiku-4-5-20251001"
+            else
+                printf '%s' "cc/claude-opus-4-8|cc/claude-sonnet-5|cc/claude-haiku-4-5-20251001"
+            fi
+            ;;
+        xai/grok-4.5|xai/grok-composer-2.5-fast)
+            printf '%s' "xai/grok-4.5|xai/grok-4.5|xai/grok-composer-2.5-fast"
+            ;;
+        *)
+            printf '%s' "$id|$id|$id"
+            ;;
+    esac
+}
+
 run_session() {
     command -v claude >/dev/null 2>&1 || { echo "9cc: claude command not found. Please install Claude Code first." >&2; return 1; }
     local key="$1"; shift || true
@@ -208,12 +231,15 @@ run_session() {
     local base token
     base="$(read_setting ANTHROPIC_BASE_URL)" || return 1
     token="$(read_setting ANTHROPIC_API_KEY)" || return 1
+    local tiers opus sonnet haiku rest
+    tiers="$(tier_defaults "$id")"
+    opus="${tiers%%|*}"; rest="${tiers#*|}"; sonnet="${rest%%|*}"; haiku="${rest##*|}"
     export ANTHROPIC_BASE_URL="$base"
     export ANTHROPIC_API_KEY="$token"
     export ANTHROPIC_MODEL="$id"
-    export ANTHROPIC_DEFAULT_OPUS_MODEL="$id"
-    export ANTHROPIC_DEFAULT_SONNET_MODEL="$id"
-    export ANTHROPIC_DEFAULT_HAIKU_MODEL="$id"
+    export ANTHROPIC_DEFAULT_OPUS_MODEL="$opus"
+    export ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet"
+    export ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku"
     export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$win"
     echo "9cc -> $id (window $win)" >&2
     exec claude "$@"
