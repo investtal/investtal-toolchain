@@ -19,7 +19,10 @@ source "$CC"
 source "$DIR/sandbox.sh" 2>/dev/null || true
 
 echo "Cycle sandbox-1: agent-proxy.mjs exists and is valid ESM"
-[ -f "$DIR/agent-proxy.mjs" ] && grep -q 'import http from "node:http"' "$DIR/agent-proxy.mjs" && \
+[ -f "$DIR/agent-proxy.mjs" ] && \
+    grep -q 'import http from "node:http"' "$DIR/agent-proxy.mjs" && \
+    grep -q '/healthz' "$DIR/agent-proxy.mjs" && \
+    grep -q 'listen(PORT, "127.0.0.1"' "$DIR/agent-proxy.mjs" && \
     { echo "  ok: agent-proxy.mjs present"; PASS=$((PASS+1)); } || \
     { echo "  FAIL: agent-proxy.mjs missing or invalid"; FAIL=$((FAIL+1)); }
 
@@ -32,18 +35,24 @@ echo "Cycle sandbox-2: Dockerfile stanzas"
     grep -q "COPY proto" "$DIR/Dockerfile" && \
     grep -q "COPY prototools" "$DIR/Dockerfile" && \
     grep -q "ENTRYPOINT" "$DIR/Dockerfile" && \
-    { echo "  ok: Dockerfile stanzas"; PASS=$((PASS+1)); } || \
+    if grep 'apt-get install' "$DIR/Dockerfile" | grep -q 'gh'; then \
+        echo "  FAIL: Dockerfile apt-get still installs gh"; FAIL=$((FAIL+1)); \
+    else \
+        { echo "  ok: Dockerfile stanzas"; PASS=$((PASS+1)); }; \
+    fi || \
     { echo "  FAIL: Dockerfile stanzas"; FAIL=$((FAIL+1)); }
+
 
 echo "Cycle sandbox-3: guard rejects home and root"
 if is_guarded_dir "$HOME" >/dev/null 2>&1; then echo "  FAIL: home dir allowed"; FAIL=$((FAIL+1)); else echo "  ok: home dir rejected"; PASS=$((PASS+1)); fi
 if is_guarded_dir "/" >/dev/null 2>&1; then echo "  FAIL: root dir allowed"; FAIL=$((FAIL+1)); else echo "  ok: root dir rejected"; PASS=$((PASS+1)); fi
 if is_guarded_dir "$DIR" >/dev/null 2>&1; then echo "  ok: project dir allowed"; PASS=$((PASS+1)); else echo "  FAIL: project dir rejected"; FAIL=$((FAIL+1)); fi
 
-echo "Cycle sandbox-4: 9cc sandbox build invokes docker build"
+echo "Cycle sandbox-4: 9cc sandbox build invokes docker build and scrubs secrets"
 mkdir -p /tmp/9cc-test-bin
 mkdir -p /tmp/9cc-test-home/.claude/local/bin
-mkdir -p /tmp/9cc-sandbox-ctx
+mkdir -p /tmp/9cc-test-home/.claude/secrets
+touch /tmp/9cc-test-home/.claude/settings.json
 cat > /tmp/9cc-test-bin/docker <<'STUB'
 #!/usr/bin/env bash
 echo "DOCKER_BUILD args:$*"
@@ -52,12 +61,32 @@ STUB
 chmod +x /tmp/9cc-test-bin/docker
 BUILD_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CLAUDE_SETTINGS=/tmp/9cc-test-settings.json "$CC" sandbox build 2>&1 || true)"
 assert_match "DOCKER_BUILD" "$BUILD_OUT" "sandbox build calls docker"
-rm -rf /tmp/9cc-test-bin /tmp/9cc-test-home /tmp/9cc-sandbox-ctx
+if [ -f /tmp/9cc-sandbox-ctx/claude/settings.json ]; then
+    echo "  FAIL: settings.json baked into context"; FAIL=$((FAIL+1));
+else
+    echo "  ok: settings.json scrubbed from context"; PASS=$((PASS+1));
+fi
+if [ -d /tmp/9cc-sandbox-ctx/claude/local ]; then
+    echo "  FAIL: host binary baked into context"; FAIL=$((FAIL+1));
+else
+    echo "  ok: host binary scrubbed from context"; PASS=$((PASS+1));
+fi
+# Refuse to wipe an unmanaged CC9_SANDBOX_CONTEXT (data-loss guard).
+BAD_CTX="$DIR/9cc-test-bad-ctx"
+mkdir -p "$BAD_CTX"
+if PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT="$BAD_CTX" CLAUDE_SETTINGS=/tmp/9cc-test-settings.json "$CC" sandbox build >/tmp/9cc-bad-ctx.log 2>&1; then
+    echo "  FAIL: build wiped unmanaged context"; FAIL=$((FAIL+1));
+else
+    echo "  ok: refuses unmanaged context"; PASS=$((PASS+1));
+fi
+[ -d "$BAD_CTX" ] && { echo "  ok: unmanaged context preserved"; PASS=$((PASS+1)); } || { echo "  FAIL: unmanaged context wiped"; FAIL=$((FAIL+1)); }
+rm -rf /tmp/9cc-test-bin /tmp/9cc-test-home /tmp/9cc-sandbox-ctx "$BAD_CTX" /tmp/9cc-bad-ctx.log "$DIR/9cc-test-bad-ctx"
 
-echo "Cycle sandbox-5: 9cc run --sandbox invokes docker run with correct mounts"
+echo "Cycle sandbox-5: 9cc run --sandbox resolves model/auth and invokes docker run with correct mounts"
 mkdir -p /tmp/9cc-test-bin
 mkdir -p /tmp/9cc-test-claude-local
 mkdir -p /tmp/9cc-sandbox-ctx
+mkdir -p /tmp/9cc-test-home
 mkdir -p /tmp/9cc-test-proj
 cat > /tmp/9cc-test-bin/docker <<'STUB'
 #!/usr/bin/env bash
@@ -68,12 +97,19 @@ STUB
 chmod +x /tmp/9cc-test-bin/docker
 export CLAUDE_SETTINGS=/tmp/9cc-test-settings.json
 printf '{"env":{"ANTHROPIC_BASE_URL":"https://gw.example/v1","ANTHROPIC_API_KEY":"sk-test"}}' > "$CLAUDE_SETTINGS"
-RUN_OUT="$(cd /tmp/9cc-test-proj && PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CC9_SANDBOX_NO_BUILD=1 "$CC" run --sandbox sonnet --version 2>/dev/null || true)"
+RUN_OUT="$(cd /tmp/9cc-test-proj && PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CC9_SANDBOX_NO_BUILD=1 "$CC" run --sandbox sonnet --version 2>&1 || true)"
 assert_match "DOCKER_RUN" "$RUN_OUT" "run --sandbox calls docker"
 assert_match "ARG:--user" "$RUN_OUT" "docker run uses --user"
 assert_match "ARG:/workspace" "$RUN_OUT" "docker run mounts /workspace"
-assert_match "ARG:--" "$RUN_OUT" "docker run has arguments"
-rm -rf /tmp/9cc-test-bin /tmp/9cc-test-claude-local /tmp/9cc-sandbox-ctx /tmp/9cc-test-proj "$CLAUDE_SETTINGS"
+assert_match "ARG:ANTHROPIC_MODEL=cc/claude-sonnet-5" "$RUN_OUT" "passes ANTHROPIC_MODEL"
+assert_match "ARG:ANTHROPIC_BASE_URL=https://gw.example/v1" "$RUN_OUT" "passes ANTHROPIC_BASE_URL"
+assert_match "ARG:ANTHROPIC_API_KEY=sk-test" "$RUN_OUT" "passes ANTHROPIC_API_KEY"
+assert_match "ARG:CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000" "$RUN_OUT" "passes compact window"
+assert_match "ARG:ANTHROPIC_DEFAULT_OPUS_MODEL=cc/claude-opus-4-8" "$RUN_OUT" "passes OPUS default"
+assert_match "ARG:ANTHROPIC_DEFAULT_HAIKU_MODEL=cc/claude-haiku-4-5-20251001" "$RUN_OUT" "passes HAIKU default"
+assert_match "ARG:claude" "$RUN_OUT" "docker run execs claude"
+assert_match "ARG:--version" "$RUN_OUT" "forwards extra args"
+rm -rf /tmp/9cc-test-bin /tmp/9cc-test-claude-local /tmp/9cc-sandbox-ctx /tmp/9cc-test-home /tmp/9cc-test-proj "$CLAUDE_SETTINGS"
 unset CLAUDE_SETTINGS
 
 echo "Cycle sandbox-6: help text mentions sandbox"
@@ -212,6 +248,11 @@ rm -rf "$CC9_HOME" "$CC9_BIN_DIR"; mkdir -p "$CC9_BIN_DIR"
 bash "$DIR/install.sh" >/tmp/9cc-install.log 2>&1 || { echo "  FAIL: install.sh exit $?"; cat /tmp/9cc-install.log; FAIL=$((FAIL+1)); }
 assert_match "cc/claude-fable-5" "$(cat "$CC9_HOME/9cc.sh" 2>/dev/null || true)" "installer wrote 9cc.sh"
 [ -x "$CC9_BIN_DIR/9cc" ] && { echo "  ok: symlink created"; PASS=$((PASS+1)); } || { echo "  FAIL: no symlink"; FAIL=$((FAIL+1)); }
+if [ -f "$CC9_HOME/sandbox.sh" ] && [ -f "$CC9_HOME/Dockerfile" ] && [ -f "$CC9_HOME/agent-proxy.mjs" ]; then
+    echo "  ok: sandbox assets installed next to launcher"; PASS=$((PASS+1));
+else
+    echo "  FAIL: sandbox assets missing from install layout"; FAIL=$((FAIL+1));
+fi
 bash "$DIR/install.sh" >>/tmp/9cc-install.log 2>&1 && { echo "  ok: re-run idempotent"; PASS=$((PASS+1)); } || { echo "  FAIL: re-run errored"; FAIL=$((FAIL+1)); }
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR" /tmp/9cc-install.log
 unset CC9_SOURCE CC9_HOME CC9_BIN_DIR

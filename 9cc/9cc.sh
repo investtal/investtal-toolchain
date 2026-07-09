@@ -255,14 +255,34 @@ main() {
          if [ "${1:-}" = "--sandbox" ]; then use_sandbox=1; shift; fi
          [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id> [--sandbox]" >&2; return 1; }
          if [ "$use_sandbox" = "1" ]; then
-             source "$DIR/sandbox.sh"
+             local props id win tiers base token opus sonnet haiku rest
+             props="$(get_model "$1")" || { echo "9cc: unknown model '$1'. Run '9cc list'." >&2; return 1; }
+             id="${props%%|*}"; win="${props##*|}"
+             tiers="$(tier_defaults "$id")"
+             opus="${tiers%%|*}"; rest="${tiers#*|}"; sonnet="${rest%%|*}"; haiku="${rest##*|}"
+             base="$(read_setting ANTHROPIC_BASE_URL)" || return 1
+             token="$(read_setting ANTHROPIC_API_KEY)" || return 1
+             export ANTHROPIC_MODEL="$id"
+             export ANTHROPIC_DEFAULT_OPUS_MODEL="$opus"
+             export ANTHROPIC_DEFAULT_SONNET_MODEL="$sonnet"
+             export ANTHROPIC_DEFAULT_HAIKU_MODEL="$haiku"
+             export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$win"
+             export ANTHROPIC_BASE_URL="$base"
+             export ANTHROPIC_API_KEY="$token"
+             local sandbox_script="$CC9_HOME/sandbox.sh"
+             [ -f "$sandbox_script" ] || sandbox_script="$DIR/sandbox.sh"
+             export CC9_SANDBOX_DIR="$DIR"
+             source "$sandbox_script"
              run_sandboxed "$@"
          else
              run_session "$@"
          fi
          ;;
     sandbox) shift || true
-        source "$DIR/sandbox.sh"
+        local sandbox_script="$CC9_HOME/sandbox.sh"
+        [ -f "$sandbox_script" ] || sandbox_script="$DIR/sandbox.sh"
+        export CC9_SANDBOX_DIR="$DIR"
+        source "$sandbox_script"
         case "${1:-}" in
             build) shift || true; build_image ;;
             *)     echo "9cc sandbox: usage: 9cc sandbox build" >&2; return 1 ;;

@@ -118,8 +118,10 @@ In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5
 **Sandbox mode** (`9cc run <model> --sandbox`) runs Claude Code inside a Docker container. It:
 - mounts only the current project directory as the workspace;
 - hides `~`, `~/.ssh`, `~/.aws`, and the host shell environment;
-- copies `~/.claude`, `~/.investtal`, `~/.proto`, and `~/.prototools` into the image at build time;
+- copies `~/.claude` (minus `settings.json` and the host `local/` binary), `~/.investtal`, `~/.proto`, and `~/.prototools` into the image at build time;
 - mounts `~/.claude/settings.json` read-only for auth;
+- runs as the host uid:gid (bash/pwsh-on-WSL; native Windows uses container defaults);
+- refuses to run from `~` or `/`;
 - routes Claude's outbound API/tool traffic through an in-container agent-proxy that logs every request to Markdown in `~/.9cc/egress/`.
 
 Full design: [`docs/ideas/0002-ManageClaudeCodeCLI.spec.md`](docs/ideas/0002-ManageClaudeCodeCLI.spec.md).
