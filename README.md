@@ -130,7 +130,7 @@ Overnight auto-pilot is deferred to a follow-up.
 
 ## CI
 
-`9cc` is gated by a Jenkins pipeline ([`Jenkinsfile`](Jenkinsfile)) that runs:
+`9cc` is gated by a Jenkins pipeline ([`jenkins/Jenkinsfile`](jenkins/Jenkinsfile)) that runs:
 1. **Unit tests** (`9cc/9cc.test.sh`) — including a macOS-strict `base64` shim (Cycle 14c) so a Linux-only server still catches the line-wrapped-base64 regression that once broke `9cc update` on macOS.
 2. **Update smoke test** (`9cc/smoke.sh`) — hermetic end-to-end run of the install/decode/update path.
 3. **Real macOS** — auto-enables once a `macos`-labeled Jenkins agent exists; skipped today (Ubuntu-only fleet).
