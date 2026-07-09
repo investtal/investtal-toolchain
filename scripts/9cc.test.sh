@@ -19,8 +19,8 @@ source "$CC"
 echo "Cycle 1: registry maps all 13 aliases"
 # plain list (POSIX): "alias|expected_id|expected_window" — no associative array (macOS bash 3.2)
 WANT_LIST="\
-fable|cc/fable-5|200000
-opus|cc/claude-opus-4-8|200000
+fable|cc/claude-fable-5|1000000
+opus|cc/claude-opus-4-8|1000000
 sonnet|cc/claude-sonnet-5|200000
 haiku|cc/claude-haiku-4-5-20251001|200000
 gpt5|cx/gpt-5.5|128000
@@ -39,7 +39,7 @@ done <<<"$WANT_LIST"
 
 echo "Cycle 2: full-ID resolves to same id|window"
 assert_eq "$(get_model 'glm/glm-5.2')"           "glm/glm-5.2|1000000" "full glm"
-assert_eq "$(get_model 'cc/fable-5')"            "cc/fable-5|200000"   "full fable"
+assert_eq "$(get_model 'cc/claude-fable-5')"     "cc/claude-fable-5|1000000"   "full fable"
 assert_eq "$(get_model 'minimax/MiniMax-M3')"    "minimax/MiniMax-M3|1000000" "full minimax"
 
 echo "Cycle 3: unknown alias exits non-zero"
@@ -91,7 +91,7 @@ export CC9_HOME=/tmp/9cc-home
 export CC9_BIN_DIR=/tmp/9cc-bin
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR"; mkdir -p "$CC9_BIN_DIR"
 bash "$DIR/install.sh" >/tmp/9cc-install.log 2>&1 || { echo "  FAIL: install.sh exit $?"; cat /tmp/9cc-install.log; FAIL=$((FAIL+1)); }
-assert_match "cc/fable-5" "$(cat "$CC9_HOME/9cc.sh" 2>/dev/null || true)" "installer wrote 9cc.sh"
+assert_match "cc/claude-fable-5" "$(cat "$CC9_HOME/9cc.sh" 2>/dev/null || true)" "installer wrote 9cc.sh"
 [ -x "$CC9_BIN_DIR/9cc" ] && { echo "  ok: symlink created"; PASS=$((PASS+1)); } || { echo "  FAIL: no symlink"; FAIL=$((FAIL+1)); }
 bash "$DIR/install.sh" >>/tmp/9cc-install.log 2>&1 && { echo "  ok: re-run idempotent"; PASS=$((PASS+1)); } || { echo "  FAIL: re-run errored"; FAIL=$((FAIL+1)); }
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR" /tmp/9cc-install.log
@@ -130,7 +130,7 @@ echo "$JSON" | node -e '
     const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
     if (!Array.isArray(d) || d.length !== 13) { console.error("FAIL: want 13 entries, got", d.length); process.exit(1); }
     const f = d.find(x => x.alias === "fable");
-    if (!f || f.id !== "cc/fable-5" || f.window !== 200000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
+    if (!f || f.id !== "cc/claude-fable-5" || f.window !== 1000000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
     if (!d.every(x => typeof x.window === "number")) { console.error("FAIL: window not numeric"); process.exit(1); }
     console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
 ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
