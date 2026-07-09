@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 9cc — launch Claude Code with a dynamic model over the 9Router gateway.
 # Reads auth from ~/.claude/settings.json (read-only). Mac/Linux/WSL.
-# Usage: 9cc list | 9cc run <alias-or-id> [claude args...] | 9cc help
+# Usage: 9cc list | run | next | update | uninstall | version | help
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
@@ -40,10 +40,12 @@ cascade_for() {
 
 get_latest_tag() {
     local api="https://api.github.com/repos/investtal/investtal-toolchain/releases/latest"
-    local resp
+    local resp=""
     if [ -n "${CC9_LATEST_API_FIXTURE:-}" ]; then
         if [ ! -f "$CC9_LATEST_API_FIXTURE" ]; then return 1; fi
         resp="$(cat "$CC9_LATEST_API_FIXTURE")" || return 1
+    elif command -v gh >/dev/null 2>&1; then
+        resp="$(gh api repos/investtal/investtal-toolchain/releases/latest 2>/dev/null)" || return 1
     else
         command -v curl >/dev/null 2>&1 || { echo "9cc update: curl not found" >&2; return 1; }
         resp="$(curl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 1
@@ -51,16 +53,16 @@ get_latest_tag() {
 
     local tag=""
     if command -v node >/dev/null 2>&1; then
-        tag="$(printf '%s\n' "$resp" | node -e '
-            try {
-                const d = JSON.parse(require("fs").readFileSync(0, "utf8"));
-                const t = d.tag_name;
-                if (typeof t === "string" && t.length) process.stdout.write(t);
-                else process.exit(1);
-            } catch (e) { process.exit(1); }
+        tag="$(printf '%s' "$resp" | node -e '
+            let d;
+            try { d = JSON.parse(require("fs").readFileSync(0, "utf8")); }
+            catch (e) { process.exit(1); }
+            const t = d && d.tag_name;
+            if (t && String(t).length) process.stdout.write(String(t));
+            else process.exit(1);
         ' 2>/dev/null)" || return 1
     else
-        tag="$(printf '%s\n' "$resp" \
+        tag="$(printf '%s' "$resp" \
             | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
             | sed -E 's/.*"([^"]+)".*/\1/' \
             | head -n1)"

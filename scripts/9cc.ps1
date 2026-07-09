@@ -1,6 +1,6 @@
 # 9cc — launch Claude Code with a dynamic model over the 9Router gateway.
 # Reads auth from ~/.claude/settings.json (read-only). Windows native.
-# Usage: 9cc.ps1 list | 9cc.ps1 run <alias-or-id> [claude args...] | 9cc.ps1 help
+# Usage: 9cc.ps1 list | run | next | update | uninstall | version | help
 [CmdletBinding()]
 param([switch]$DotSource)
 $ErrorActionPreference = 'Stop'
@@ -54,6 +54,12 @@ function Get-LatestTag {
             $resp = Get-Content -Raw $env:CC9_LATEST_API_FIXTURE | ConvertFrom-Json -ErrorAction Stop
             return $resp.tag_name
         } catch { return $null }
+    }
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        try {
+            $tag = gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>$null
+            if ($tag -and $tag -match '^v') { return $tag.Trim() }
+        } catch { }
     }
     $api = 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest'
     try {

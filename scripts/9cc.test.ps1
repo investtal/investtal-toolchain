@@ -119,6 +119,16 @@ if ($src -match 'contents/scripts/9cc\.ps1' -and $src -match 'Get-Command gh' -a
     Write-Host "  FAIL: install.ps1 missing gh-first body fetch"; $script:Fail++
 }
 
+Write-Host "Cycle 12: Get-LatestTag prefers gh"
+$fn = (Get-Content -Raw "$DIR\9cc.ps1")
+if ($fn -match 'function Get-LatestTag' -and $fn -match "Get-Command gh") {
+    # ensure gh appears inside Get-LatestTag region roughly: between function and next function
+    $m = [regex]::Match($fn, 'function Get-LatestTag[\s\S]*?function Update-9cc')
+    if ($m.Success -and $m.Value -match 'Get-Command gh') {
+        Write-Host "  ok: Get-LatestTag uses gh"; $script:Pass++
+    } else { Write-Host "  FAIL: Get-LatestTag missing gh"; $script:Fail++ }
+} else { Write-Host "  FAIL: Get-LatestTag missing gh"; $script:Fail++ }
+
 Write-Host "----"
 Write-Host "PASS=$script:Pass FAIL=$script:Fail"
 if ($script:Fail -ne 0) { exit 1 }

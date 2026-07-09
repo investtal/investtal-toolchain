@@ -191,6 +191,13 @@ else
     FAIL=$((FAIL+1))
 fi
 
+echo "Cycle 17: get_latest_tag prefers gh"
+if awk '/get_latest_tag\(\)/,/^}/' "$DIR/9cc.sh" | grep -q 'command -v gh'; then
+    echo "  ok: get_latest_tag uses gh"; PASS=$((PASS+1))
+else
+    echo "  FAIL: get_latest_tag missing gh preference"; FAIL=$((FAIL+1))
+fi
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
