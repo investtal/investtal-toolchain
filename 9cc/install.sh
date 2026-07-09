@@ -48,6 +48,16 @@ fi
 chmod +x "$CC9_HOME/9cc.sh"
 printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
+# Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
+src_dir="$(dirname "$CC9_HOME/9cc.sh")"
+if [ -n "$CC9_SOURCE" ] && [ -f "$CC9_SOURCE" ]; then
+    src_dir="$(dirname "$CC9_SOURCE")"
+fi
+mkdir -p "$CC9_HOME/9cc"
+for f in Dockerfile agent-proxy.mjs sandbox-entrypoint.sh sandbox.sh; do
+    if [ -f "$src_dir/$f" ]; then cp "$src_dir/$f" "$CC9_HOME/9cc/$f"; fi
+done
+
 ln -sfn "$CC9_HOME/9cc.sh" "$CC9_BIN_DIR/9cc"
 
 echo "9cc installed: $CC9_HOME/9cc.sh"
