@@ -10,7 +10,7 @@ function Assert-Eq($a, $b, $label) {
 
 Write-Host "Cycle 1: registry 13 aliases"
 $want = @{
-  fable=@{Id='cc/fable-5';Window='200000'}; opus=@{Id='cc/claude-opus-4-8';Window='200000'}
+  fable=@{Id='cc/claude-fable-5';Window='1000000'}; opus=@{Id='cc/claude-opus-4-8';Window='1000000'}
   sonnet=@{Id='cc/claude-sonnet-5';Window='200000'}; haiku=@{Id='cc/claude-haiku-4-5-20251001';Window='200000'}
   gpt5=@{Id='cx/gpt-5.5';Window='128000'}; glm5=@{Id='glm/glm-5.2';Window='1000000'}
   glmturbo=@{Id='glm/glm-5-turbo';Window='1000000'}; deepseek=@{Id='ds/deepseek-v4-pro';Window='1000000'}
@@ -26,7 +26,7 @@ foreach ($k in $want.Keys) {
 
 Write-Host "Cycle 2: full-ID resolve"
 $f = Get-Model 'glm/glm-5.2'; Assert-Eq $f.Id 'glm/glm-5.2' "full glm"
-$f2 = Get-Model 'cc/fable-5'; Assert-Eq $f2.Id 'cc/fable-5' "full fable"
+$f2 = Get-Model 'cc/claude-fable-5'; Assert-Eq $f2.Id 'cc/claude-fable-5' "full fable"
 
 Write-Host "Cycle 3: unknown -> null"
 if ($null -eq (Get-Model 'nope')) { Write-Host "  ok: unknown null"; $script:Pass++ } else { Write-Host "  FAIL"; $script:Fail++ }
