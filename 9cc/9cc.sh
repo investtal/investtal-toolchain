@@ -197,14 +197,26 @@ list_models() {
 }
 
 read_setting() {
-    command -v node >/dev/null 2>&1 || { echo "9cc: node not found (required to read settings.json)" >&2; return 1; }
-    local v; v="$(CLAUDE_SETTINGS="$CLAUDE_SETTINGS" node -e '
-        const fs=require("fs"); let s={};
-        try{ s=JSON.parse(fs.readFileSync(process.env.CLAUDE_SETTINGS,"utf8")); }catch(e){ process.exit(1); }
-        const v=(s.env||{})[process.argv[1]];
-        if(!v) process.exit(1);
-        process.stdout.write(v);
-    ' "$1")" || { echo "9cc: '$1' not found in $CLAUDE_SETTINGS env" >&2; return 1; }
+    [ -f "$CLAUDE_SETTINGS" ] || { echo "9cc: settings not found at $CLAUDE_SETTINGS" >&2; return 1; }
+    local key="$1" v=""
+    if command -v node >/dev/null 2>&1; then
+        v="$(CLAUDE_SETTINGS="$CLAUDE_SETTINGS" node -e '
+            const fs=require("fs"); let s={};
+            try{ s=JSON.parse(fs.readFileSync(process.env.CLAUDE_SETTINGS,"utf8")); }catch(e){ process.exit(1); }
+            const v=(s.env||{})[process.argv[1]];
+            if(!v) process.exit(1);
+            process.stdout.write(v);
+        ' "$key" 2>/dev/null)" || v=""
+    fi
+    # Fallback when node is unavailable: pull "key":"value" from the env block
+    # with a JSON-aware-ish unescape. settings.json is a flat env object.
+    if [ -z "$v" ]; then
+        v="$(grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$CLAUDE_SETTINGS" \
+            | sed -E 's/.*:[[:space:]]*"(.*)"$/\1/' | head -n1)"
+        # unescape common JSON string escapes
+        v="${v//\\\"/\"}"; v="${v//\\\\/\\}"; v="${v//\\n/$'\n'}"; v="${v//\\t/$'\t'}"
+    fi
+    [ -n "$v" ] || { echo "9cc: '$key' not found in $CLAUDE_SETTINGS env" >&2; return 1; }
     printf '%s' "$v"
 }
 
