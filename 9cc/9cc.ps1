@@ -216,10 +216,13 @@ if (-not $DotSource) {
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
         'run'  {
                  if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id> [--sandbox]"; exit 1 }
-                 $useSandbox = $args[1] -eq '--sandbox'
-                 if ($useSandbox) {
+                 $useSandbox = ($args[1] -eq '--sandbox') -or ($args.Count -ge 3 -and $args[2] -eq '--sandbox')
+                 if ($args[1] -eq '--sandbox') {
                      if ($args.Count -lt 3) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run --sandbox <alias|id>"; exit 1 }
                      $modelKey = $args[2]
+                     $extraArgs = $args | Select-Object -Skip 3
+                 } elseif ($args.Count -ge 3 -and $args[2] -eq '--sandbox') {
+                     $modelKey = $args[1]
                      $extraArgs = $args | Select-Object -Skip 3
                  } else {
                      $modelKey = $args[1]

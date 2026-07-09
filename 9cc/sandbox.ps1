@@ -14,7 +14,6 @@ function Test-GuardedDir {
     $homeResolved = (Resolve-Path $env:USERPROFILE).Path.TrimEnd('\','/')
     $root = ([System.IO.Path]::GetPathRoot($resolved)).TrimEnd('\','/')
     if ($resolved -eq $homeResolved -or $resolved -eq $root -or $resolved -eq '/') {
-        Write-Error "9cc sandbox: refusing to run in $resolved (mount would expose home or root)"
         return $true
     }
     return $false
@@ -31,9 +30,8 @@ function Build-SandboxImage {
     if (-not (Test-Path $claudeLocal)) { throw "9cc sandbox: $claudeLocal not found; install Claude Code first" }
 
     # Guard: only wipe our own managed context dir to avoid data loss if user overrides CC9_SANDBOX_CONTEXT.
-    $ctxNorm = (Resolve-Path $SandboxContext -ErrorAction SilentlyContinue).Path
     $homeNorm = (Resolve-Path $CC9Home).Path
-    $isManaged = ($SandboxContext -like "$homeNorm*") -or ($SandboxContext -like "$([System.IO.Path]::GetTempPath()*")
+    $isManaged = ($SandboxContext -like "$homeNorm*") -or ($SandboxContext -like "$([System.IO.Path]::GetTempPath())*")
     if (-not $isManaged) { throw "9cc sandbox: refusing to wipe CC9_SANDBOX_CONTEXT=$SandboxContext (must be under `$CC9_HOME or temp)" }
     if (Test-Path $SandboxContext) { Remove-Item -Recurse -Force $SandboxContext }
     New-Item -ItemType Directory -Force $SandboxContext | Out-Null
@@ -73,7 +71,7 @@ function Get-EgressDir {
 function Invoke-SandboxRun {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw '9cc sandbox: docker not found' }
     $cwd = (Resolve-Path '.').Path
-    if (Test-GuardedDir $cwd) { throw '9cc sandbox: guarded directory' }
+    if (Test-GuardedDir $cwd) { throw "9cc sandbox: refusing to run in $cwd (mount would expose home or root)" }
 
     if ($env:CC9_SANDBOX_NO_BUILD -ne '1') {
         try { docker image inspect $SandboxImage | Out-Null } catch { Build-SandboxImage }
