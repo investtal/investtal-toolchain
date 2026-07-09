@@ -9,7 +9,7 @@ CLI launch Claude Code with dynamic model + compact-window over 9Router gateway.
 
 ## Constraints
 
-- **2 files only:** `9cc.sh` (mac/linux/wsl) + `9cc.ps1` (windows native). No binary, no runtime dep.
+- **2 launchers only:** `9cc.sh` (mac/linux/wsl) + `9cc.ps1` (windows native). No binary, no runtime dep. (Installers + tests added for distribution; launchers remain 2.)
 - **Auth:** `ANTHROPIC_API_KEY` (NOT `ANTHROPIC_AUTH_TOKEN` as draft proposed).
 - **Secret reuse:** Read `ANTHROPIC_BASE_URL` + `ANTHROPIC_API_KEY` from existing `settings.json` `env` block (`https://ai.investtal.com/v1` + `sk-...`). No file write, no `9cc.env`, no `setup` command.
 - **No config mutation:** Shell env export before `exec claude` overrides settings.json `env` block (shell env wins — confirmed via CC env precedence). Hooks/permissions/rtk/graphify/skipDangerous untouched.
@@ -17,12 +17,12 @@ CLI launch Claude Code with dynamic model + compact-window over 9Router gateway.
 - **Per-model compact window:** `CLAUDE_CODE_AUTO_COMPACT_WINDOW` = model's window at launch.
 - **Dual alias UX:** Accept short alias (`fable`, `glm5`) AND full 9Router ID (`glm/glm-5.2`).
 
-## Model registry (13 models)
+## Model registry (13 models — shipped)
 
 | Alias | 9Router ID | Window |
 |-------|-----------|--------|
-| fable | cc/fable-5 | 200000 |
-| opus | cc/claude-opus-4-8 | 200000 |
+| fable | cc/claude-fable-5 | 1000000 |
+| opus | cc/claude-opus-4-8 | 1000000 |
 | sonnet | cc/claude-sonnet-5 | 200000 |
 | haiku | cc/claude-haiku-4-5-20251001 | 200000 |
 | gpt5 | cx/gpt-5.5 | 128000 |
@@ -31,23 +31,34 @@ CLI launch Claude Code with dynamic model + compact-window over 9Router gateway.
 | deepseek | ds/deepseek-v4-pro | 1000000 |
 | dsflash | ds/deepseek-v4-flash | 1000000 |
 | kimi | kimi/kimi-k2.7 | 1000000 |
-| grok | gc/grok-build | 500000 |
-| grokcomposer | gc/grok-composer-2.5-fast | 500000 |
+| grok | xai/grok-4.5 | 500000 |
+| grokcomposer | xai/grok-composer-2.5-fast | 500000 |
 | minimax | minimax/MiniMax-M3 | 1000000 |
 
-## Commands (v1)
+## Commands (shipped)
 
-- `9cc list` — table of alias | ID | window.
-- `9cc run <alias-or-id> [claude args...]` — export env, `exec claude`.
-- `9cc help` (or no args) — usage.
+- `9cc list` / `9cc list --json` — table or machine-readable registry
+- `9cc run <alias-or-id> [claude args...]` — export env, `exec claude`
+- `9cc next <id|alias> [--no-free]` — cascade successor (fleet healer)
+- `9cc update` — self-update to latest release
+- `9cc uninstall` — remove home + PATH entry
+- `9cc version` / `-v` / `--version`
+- `9cc help` (or no args)
 
-## Success criteria
+## Distribution (shipped)
 
-- `9cc run fable` launches Claude Code with `cc/fable-5`, compact 200K, reads key from settings.json, settings.json byte-identical after.
-- `9cc run glm/glm-5.2` (full ID) works same as `9cc run glm5`.
-- `9cc list` prints all 13 models.
-- Both `.sh` and `.ps1` produce identical behavior.
-- No `setup`, no file writes, no overwrite of settings.json.
+- Launchers: `scripts/9cc.sh`, `scripts/9cc.ps1`
+- Installers: `scripts/install.sh`, `scripts/install.ps1`
+- Install (mac/linux): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | bash`
+- Install (windows): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.ps1 --jq '.content' | base64 -d | powershell -c -`
+- Pin: `?ref=<tag>` on contents path and/or `CC9_VERSION=<tag>`
+
+## Success criteria (updated)
+
+- `9cc run fable` → `cc/claude-fable-5`, window 1M, settings.json read-only
+- `9cc list` / `list --json` cover all 13 models
+- `9cc update` / `uninstall` / `version` work on both platforms
+- Install/update prefer `gh` then raw fallback
 
 ## Decisions (trade-off → chosen → why)
 
