@@ -79,17 +79,17 @@ Launch Claude Code with a dynamic model over the 9Router gateway. Reads auth fro
 
 **Install (mac/linux/wsl):**
 ```sh
-gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | bash
+gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | bash
 ```
 **Install (windows, PowerShell):**
 ```powershell
-gh api repos/investtal/investtal-toolchain/contents/scripts/install.ps1 --jq '.content' | base64 -d | powershell -c -  
+gh api repos/investtal/investtal-toolchain/contents/9cc/install.ps1 --jq '.content' | base64 -d | powershell -c -  
 ```
 Pin a specific version or commit SHA via `CC9_VERSION` or by adding `?ref=<tag>` to the API path:
 ```sh
-gh api "repos/investtal/investtal-toolchain/contents/scripts/install.sh?ref=v0.3.5" --jq '.content' | base64 -d | bash
-gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.3.5 bash
-gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | CC9_VERSION=<full-commit-sha> bash
+gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=v0.3.5" --jq '.content' | base64 -d | bash
+gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.3.5 bash
+gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=<full-commit-sha> bash
 ```
 Check installed version: `9cc version`.
 

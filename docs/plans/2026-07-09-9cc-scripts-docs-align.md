@@ -2,18 +2,18 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: use `subagent-parallel-execution` (recommended) or inline execution via `finishing-execution` to implement task-by-task. Steps use `- [ ]` checkboxes.
 
-**Goal:** Finish `scripts/` 9cc install/update path so every download prefers `gh api` (rate-limit safe) with raw fallback, and bring docs in line with the shipped CLI (commands, models, install one-liners).
+**Goal:** Finish `9cc/` 9cc install/update path so every download prefers `gh api` (rate-limit safe) with raw fallback, and bring docs in line with the shipped CLI (commands, models, install one-liners).
 
-**Architecture:** Installers already resolve latest tag via `gh` then curl. Still fetch launcher body via `raw.githubusercontent.com`. Mirror the `9cc update` pattern: if `gh` exists, `gh api repos/.../contents/scripts/9cc.{sh,ps1}?ref=$TAG --jq .content | base64 -d`; else raw URL. Docs that still describe curl-only install or v1-only commands get rewritten to match `scripts/9cc.sh` + README.
+**Architecture:** Installers already resolve latest tag via `gh` then curl. Still fetch launcher body via `raw.githubusercontent.com`. Mirror the `9cc update` pattern: if `gh` exists, `gh api repos/.../contents/9cc/9cc.{sh,ps1}?ref=$TAG --jq .content | base64 -d`; else raw URL. Docs that still describe curl-only install or v1-only commands get rewritten to match `9cc/9cc.sh` + README.
 
-**Tech Stack:** Bash 3.2+/4+, PowerShell 5.1+, `gh` CLI (preferred), curl/IRM fallback, assert-based tests in `scripts/9cc.test.sh` / `scripts/9cc.test.ps1`.
+**Tech Stack:** Bash 3.2+/4+, PowerShell 5.1+, `gh` CLI (preferred), curl/IRM fallback, assert-based tests in `9cc/9cc.test.sh` / `9cc/9cc.test.ps1`.
 
 ## Global Constraints
 
 - Prefer `gh api` over raw GitHub URLs for release/content fetch (IVT-0608).
 - Keep local-fixture path: if `CC9_SOURCE` is an existing file, copy it (tests).
 - Do not add deps, frameworks, or new script files.
-- Model registry stays the 13 entries already in `scripts/9cc.sh` / `scripts/9cc.ps1`.
+- Model registry stays the 13 entries already in `9cc/9cc.sh` / `9cc/9cc.ps1`.
 - README install one-liners already use `gh api contents`; keep that as public install path.
 - Historical plan `docs/plans/2026-07-08-9cc-model-switcher.md` is a record of past work — do not rewrite it; only add a short status note at top if touched.
 
@@ -21,12 +21,12 @@
 
 | File | Responsibility |
 |------|----------------|
-| `scripts/install.sh` | Unix installer: resolve tag, fetch `9cc.sh` via gh→raw, symlink |
-| `scripts/install.ps1` | Windows installer: resolve tag, fetch `9cc.ps1` via gh→raw, bin copy |
-| `scripts/9cc.sh` | Launcher; `get_latest_tag` should prefer `gh` like installers |
-| `scripts/9cc.ps1` | Launcher; `Get-LatestTag` should prefer `gh` like installers |
-| `scripts/9cc.test.sh` | Assert install + update + uninstall + models |
-| `scripts/9cc.test.ps1` | PowerShell mirror of tests |
+| `9cc/install.sh` | Unix installer: resolve tag, fetch `9cc.sh` via gh→raw, symlink |
+| `9cc/install.ps1` | Windows installer: resolve tag, fetch `9cc.ps1` via gh→raw, bin copy |
+| `9cc/9cc.sh` | Launcher; `get_latest_tag` should prefer `gh` like installers |
+| `9cc/9cc.ps1` | Launcher; `Get-LatestTag` should prefer `gh` like installers |
+| `9cc/9cc.test.sh` | Assert install + update + uninstall + models |
+| `9cc/9cc.test.ps1` | PowerShell mirror of tests |
 | `docs/specs/2026-07-09-9cc-update.md` | Design spec for update (stale: raw-only) |
 | `docs/ideas/0002-ManageClaudeCodeCLI.spec.md` | Resolved product spec (stale: models + commands) |
 | `README.md` | Public install/use (already mostly current; only fix if drift found) |
@@ -36,20 +36,20 @@
 ### Task 1: install.sh prefers `gh api` for launcher body
 
 **Files:**
-- Modify: `scripts/install.sh`
-- Test: `scripts/9cc.test.sh` (Cycle 7 already covers local fixture; extend with download-path unit via env)
+- Modify: `9cc/install.sh`
+- Test: `9cc/9cc.test.sh` (Cycle 7 already covers local fixture; extend with download-path unit via env)
 
 **Interfaces:**
 - Consumes: `CC9_VERSION`, `CC9_SOURCE`, `CC9_HOME`, `CC9_BIN_DIR`
 - Produces: `$CC9_HOME/9cc.sh`, `$CC9_HOME/version`, symlink `$CC9_BIN_DIR/9cc`
 
-- [ ] **Step 1: Write the failing test** — append to `scripts/9cc.test.sh` before final `PASS/FAIL` summary:
+- [ ] **Step 1: Write the failing test** — append to `9cc/9cc.test.sh` before final `PASS/FAIL` summary:
 
 ```bash
 echo "Cycle 16: install.sh prefers gh contents when CC9_SOURCE is remote URL"
 # Simulate remote: set CC9_SOURCE to a non-file URL and intercept via a fake PATH/gh is hard;
 # instead assert the source script contains the gh contents fetch branch (static contract).
-if grep -q 'contents/scripts/9cc.sh' "$DIR/install.sh" \
+if grep -q 'contents/9cc/9cc.sh' "$DIR/install.sh" \
    && grep -q 'command -v gh' "$DIR/install.sh" \
    && grep -q 'raw.githubusercontent.com' "$DIR/install.sh"; then
     echo "  ok: install.sh has gh contents + raw fallback"
@@ -60,9 +60,9 @@ else
 fi
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — Run: `bash scripts/9cc.test.sh` Expected: FAIL with `install.sh missing gh-first body fetch`
+- [ ] **Step 2: Run test, verify it fails** — Run: `bash 9cc/9cc.test.sh` Expected: FAIL with `install.sh missing gh-first body fetch`
 
-- [ ] **Step 3: Write minimal implementation** — replace the download block in `scripts/install.sh` (keep local-file branch). Full file after change:
+- [ ] **Step 3: Write minimal implementation** — replace the download block in `9cc/install.sh` (keep local-file branch). Full file after change:
 
 ```bash
 #!/usr/bin/env bash
@@ -101,14 +101,14 @@ elif [ -n "$CC9_SOURCE" ]; then
 else
     fetched=0
     if command -v gh >/dev/null 2>&1; then
-        if content="$(gh api "repos/investtal/investtal-toolchain/contents/scripts/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
+        if content="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
             if [ -n "$content" ] && printf '%s' "$content" | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
                 fetched=1
             fi
         fi
     fi
     if [ "$fetched" != "1" ]; then
-        raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh"
+        raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/9cc.sh"
         curl -fsSL "$raw" -o "$CC9_HOME/9cc.sh"
     fi
 fi
@@ -121,7 +121,7 @@ echo "9cc installed: $CC9_HOME/9cc.sh"
 echo "symlink:       $CC9_BIN_DIR/9cc  (ensure it's on your PATH)"
 ```
 
-- [ ] **Step 4: Run test, verify pass** — Run: `bash scripts/9cc.test.sh` Expected: `PASS=65 FAIL=0` (or prior PASS+1)
+- [ ] **Step 4: Run test, verify pass** — Run: `bash 9cc/9cc.test.sh` Expected: `PASS=65 FAIL=0` (or prior PASS+1)
 
 - [ ] **Step 5: Commit** — `git commit -m "fix(9cc): prefer gh api for install.sh launcher fetch IVT-0608"`
 
@@ -130,28 +130,28 @@ echo "symlink:       $CC9_BIN_DIR/9cc  (ensure it's on your PATH)"
 ### Task 2: install.ps1 prefers `gh api` for launcher body
 
 **Files:**
-- Modify: `scripts/install.ps1`
-- Test: `scripts/9cc.test.ps1` (static contract + existing fixture cycles)
+- Modify: `9cc/install.ps1`
+- Test: `9cc/9cc.test.ps1` (static contract + existing fixture cycles)
 
 **Interfaces:**
 - Consumes: `$env:CC9_VERSION`, `$env:CC9_SOURCE`, `$env:CC9_HOME`, `$env:CC9_BIN_DIR`
 - Produces: `~\.9cc\9cc.ps1`, version file, bin copy
 
-- [ ] **Step 1: Write the failing test** — append to `scripts/9cc.test.ps1` before final summary:
+- [ ] **Step 1: Write the failing test** — append to `9cc/9cc.test.ps1` before final summary:
 
 ```powershell
 Write-Host "Cycle 11: install.ps1 prefers gh contents for remote source"
 $src = Get-Content -Raw "$DIR\install.ps1"
-if ($src -match 'contents/scripts/9cc\.ps1' -and $src -match 'Get-Command gh' -and $src -match 'raw\.githubusercontent\.com') {
+if ($src -match 'contents/9cc/9cc\.ps1' -and $src -match 'Get-Command gh' -and $src -match 'raw\.githubusercontent\.com') {
     Write-Host "  ok: install.ps1 has gh contents + raw fallback"; $PASS++
 } else {
     Write-Host "  FAIL: install.ps1 missing gh-first body fetch"; $FAIL++
 }
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — Run: `pwsh -File scripts/9cc.test.ps1` (or `powershell -File …` on Windows) Expected: FAIL `install.ps1 missing gh-first body fetch`
+- [ ] **Step 2: Run test, verify it fails** — Run: `pwsh -File 9cc/9cc.test.ps1` (or `powershell -File …` on Windows) Expected: FAIL `install.ps1 missing gh-first body fetch`
 
-- [ ] **Step 3: Write minimal implementation** — full `scripts/install.ps1`:
+- [ ] **Step 3: Write minimal implementation** — full `9cc/install.ps1`:
 
 ```powershell
 # 9cc installer — prefer: gh api contents | base64 decode | iex
@@ -194,7 +194,7 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
 } else {
     $fetched = $false
     if (Get-Command gh -ErrorAction SilentlyContinue) {
-        $encoded = gh api "repos/investtal/investtal-toolchain/contents/scripts/9cc.ps1?ref=$Ver" --jq '.content' 2>$null
+        $encoded = gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.ps1?ref=$Ver" --jq '.content' 2>$null
         if ($encoded) {
             $bytes = [System.Convert]::FromBase64String(($encoded -replace '\s',''))
             [System.IO.File]::WriteAllBytes($target, $bytes)
@@ -202,7 +202,7 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
         }
     }
     if (-not $fetched) {
-        $Src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/scripts/9cc.ps1"
+        $Src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/9cc/9cc.ps1"
         Invoke-WebRequest $Src -OutFile $target
     }
 }
@@ -213,7 +213,7 @@ Write-Host "9cc installed: $target"
 Write-Host "bin copy:      $(Join-Path $env:CC9_BIN_DIR '9cc.ps1')  (add $env:CC9_BIN_DIR to PATH if missing)"
 ```
 
-- [ ] **Step 4: Run test, verify pass** — Run: `pwsh -File scripts/9cc.test.ps1` Expected: all PASS including Cycle 11
+- [ ] **Step 4: Run test, verify pass** — Run: `pwsh -File 9cc/9cc.test.ps1` Expected: all PASS including Cycle 11
 
 - [ ] **Step 5: Commit** — `git commit -m "fix(9cc): prefer gh api for install.ps1 launcher fetch IVT-0608"`
 
@@ -222,9 +222,9 @@ Write-Host "bin copy:      $(Join-Path $env:CC9_BIN_DIR '9cc.ps1')  (add $env:CC
 ### Task 3: `get_latest_tag` / `Get-LatestTag` prefer `gh`
 
 **Files:**
-- Modify: `scripts/9cc.sh` (`get_latest_tag`)
-- Modify: `scripts/9cc.ps1` (`Get-LatestTag`)
-- Test: existing update cycles in `scripts/9cc.test.sh` / `scripts/9cc.test.ps1` (fixture path must still win)
+- Modify: `9cc/9cc.sh` (`get_latest_tag`)
+- Modify: `9cc/9cc.ps1` (`Get-LatestTag`)
+- Test: existing update cycles in `9cc/9cc.test.sh` / `9cc/9cc.test.ps1` (fixture path must still win)
 
 **Interfaces:**
 - Consumes: `CC9_LATEST_API_FIXTURE` (tests), else GitHub releases/latest
@@ -255,11 +255,11 @@ if ($fn -match 'function Get-LatestTag' -and $fn -match "Get-Command gh") {
 } else { Write-Host "  FAIL: Get-LatestTag missing gh"; $FAIL++ }
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — Run: `bash scripts/9cc.test.sh` Expected: FAIL `get_latest_tag missing gh preference`
+- [ ] **Step 2: Run test, verify it fails** — Run: `bash 9cc/9cc.test.sh` Expected: FAIL `get_latest_tag missing gh preference`
 
 - [ ] **Step 3: Write minimal implementation**
 
-Replace `get_latest_tag` in `scripts/9cc.sh` with:
+Replace `get_latest_tag` in `9cc/9cc.sh` with:
 
 ```bash
 get_latest_tag() {
@@ -294,7 +294,7 @@ get_latest_tag() {
 }
 ```
 
-Replace `Get-LatestTag` in `scripts/9cc.ps1` with:
+Replace `Get-LatestTag` in `9cc/9cc.ps1` with:
 
 ```powershell
 function Get-LatestTag {
@@ -331,7 +331,7 @@ Also refresh header usage comments to list full command surface:
 # Usage: 9cc.ps1 list | run | next | update | uninstall | version | help
 ```
 
-- [ ] **Step 4: Run test, verify pass** — Run: `bash scripts/9cc.test.sh` Expected: `FAIL=0` and update cycles still green (fixture path first)
+- [ ] **Step 4: Run test, verify pass** — Run: `bash 9cc/9cc.test.sh` Expected: `FAIL=0` and update cycles still green (fixture path first)
 
 - [ ] **Step 5: Commit** — `git commit -m "fix(9cc): prefer gh for latest-tag probe IVT-0608"`
 
@@ -359,10 +359,10 @@ Self-update installed `9cc` to latest GitHub release without re-reading install 
 
 ## Context
 
-- Launchers: `scripts/9cc.sh`, `scripts/9cc.ps1`
-- Installers: `scripts/install.sh`, `scripts/install.ps1`
+- Launchers: `9cc/9cc.sh`, `9cc/9cc.ps1`
+- Installers: `9cc/install.sh`, `9cc/install.ps1`
 - Version file: `$CC9_HOME/version` (fallback `CC9_VERSION` env, then `0.1.0-dev`)
-- Public install one-liner uses `gh api …/contents/scripts/install.{sh,ps1}` (avoids raw URL rate limits)
+- Public install one-liner uses `gh api …/contents/9cc/install.{sh,ps1}` (avoids raw URL rate limits)
 
 ## Approach: re-run installer for latest tag
 
@@ -378,7 +378,7 @@ Test hooks:
 ## Installer fetch order (body + installer scripts)
 
 1. Local file when `CC9_SOURCE` / fixture path exists
-2. `gh api repos/investtal/investtal-toolchain/contents/scripts/<file>?ref=<tag> --jq .content` + base64 decode
+2. `gh api repos/investtal/investtal-toolchain/contents/9cc/<file>?ref=<tag> --jq .content` + base64 decode
 3. `raw.githubusercontent.com/investtal/investtal-toolchain/<tag>/scripts/<file>`
 
 ## Commands related to lifecycle
@@ -433,10 +433,10 @@ Channels, signed releases, rollback, multi-artifact manifest.
 
 ## Distribution (shipped)
 
-- Launchers: `scripts/9cc.sh`, `scripts/9cc.ps1`
-- Installers: `scripts/install.sh`, `scripts/install.ps1`
-- Install (mac/linux): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | bash`
-- Install (windows): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.ps1 --jq '.content' | base64 -d | powershell -c -`
+- Launchers: `9cc/9cc.sh`, `9cc/9cc.ps1`
+- Installers: `9cc/install.sh`, `9cc/install.ps1`
+- Install (mac/linux): `gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | bash`
+- Install (windows): `gh api repos/investtal/investtal-toolchain/contents/9cc/install.ps1 --jq '.content' | base64 -d | powershell -c -`
 - Pin: `?ref=<tag>` on contents path and/or `CC9_VERSION=<tag>`
 
 ## Success criteria (updated)
@@ -449,12 +449,12 @@ Channels, signed releases, rollback, multi-artifact manifest.
 
 Also fix Constraints line “2 files only” → note installers + tests added for distribution (launchers remain 2).
 
-- [ ] **Step 3: README drift check** — Run: `rg -n "9cc |install|update|uninstall|list --json|next " README.md` and compare to `show_help` in `scripts/9cc.sh`. If identical surface, leave README. If missing `next` help detail or wrong model id, patch only that.
+- [ ] **Step 3: README drift check** — Run: `rg -n "9cc |install|update|uninstall|list --json|next " README.md` and compare to `show_help` in `9cc/9cc.sh`. If identical surface, leave README. If missing `next` help detail or wrong model id, patch only that.
 
 - [ ] **Step 4: Verify** — Run:
 
 ```bash
-bash scripts/9cc.test.sh
+bash 9cc/9cc.test.sh
 # Expected: FAIL=0
 rg -n "raw\.githubusercontent.com.*install" docs/specs/2026-07-09-9cc-update.md docs/ideas/0002-ManageClaudeCodeCLI.spec.md README.md || true
 # Expected: no install one-liner still requiring raw-only as primary path
@@ -473,7 +473,7 @@ rg -n "raw\.githubusercontent.com.*install" docs/specs/2026-07-09-9cc-update.md 
 
 ## Done when
 
-- `bash scripts/9cc.test.sh` → `FAIL=0`
+- `bash 9cc/9cc.test.sh` → `FAIL=0`
 - `install.sh` / `install.ps1` / `get_latest_tag` / `Get-LatestTag` all prefer `gh`
 - Specs list update/uninstall/next/list --json + current 13-model registry
 - README install path still `gh api contents`

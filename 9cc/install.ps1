@@ -38,7 +38,7 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
 } else {
     $fetched = $false
     if (Get-Command gh -ErrorAction SilentlyContinue) {
-        $encoded = gh api "repos/investtal/investtal-toolchain/contents/scripts/9cc.ps1?ref=$Ver" --jq '.content' 2>$null
+        $encoded = gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.ps1?ref=$Ver" --jq '.content' 2>$null
         if ($encoded) {
             $bytes = [System.Convert]::FromBase64String(($encoded -replace '\s',''))
             [System.IO.File]::WriteAllBytes($target, $bytes)
@@ -46,7 +46,7 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
         }
     }
     if (-not $fetched) {
-        $Src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/scripts/9cc.ps1"
+        $Src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/9cc/9cc.ps1"
         Invoke-WebRequest $Src -OutFile $target
     }
 }

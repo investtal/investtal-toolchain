@@ -1,4 +1,4 @@
-# 9cc.ps1 TDD harness. Assert-based. Run: pwsh -File scripts/9cc.test.ps1
+# 9cc.ps1 TDD harness. Assert-based. Run: pwsh -File 9cc/9cc.test.ps1
 $ErrorActionPreference = 'Stop'
 $DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:Pass = 0; $script:Fail = 0
@@ -113,7 +113,7 @@ Remove-Item Env:CC9_SOURCE,Env:CC9_HOME,Env:CC9_BIN_DIR -ErrorAction SilentlyCon
 
 Write-Host "Cycle 11: install.ps1 prefers gh contents for remote source"
 $src = Get-Content -Raw "$DIR\install.ps1"
-if ($src -match 'contents/scripts/9cc\.ps1' -and $src -match 'Get-Command gh' -and $src -match 'raw\.githubusercontent\.com') {
+if ($src -match 'contents/9cc/9cc\.ps1' -and $src -match 'Get-Command gh' -and $src -match 'raw\.githubusercontent\.com') {
     Write-Host "  ok: install.ps1 has gh contents + raw fallback"; $script:Pass++
 } else {
     Write-Host "  FAIL: install.ps1 missing gh-first body fetch"; $script:Fail++

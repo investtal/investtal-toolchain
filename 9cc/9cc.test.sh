@@ -181,7 +181,7 @@ unset CC9_SOURCE CC9_HOME CC9_BIN_DIR
 echo "Cycle 16: install.sh prefers gh contents when CC9_SOURCE is remote URL"
 # Simulate remote: set CC9_SOURCE to a non-file URL and intercept via a fake PATH/gh is hard;
 # instead assert the source script contains the gh contents fetch branch (static contract).
-if grep -q 'contents/scripts/9cc.sh' "$DIR/install.sh" \
+if grep -q 'contents/9cc/9cc.sh' "$DIR/install.sh" \
    && grep -q 'command -v gh' "$DIR/install.sh" \
    && grep -q 'raw.githubusercontent.com' "$DIR/install.sh"; then
     echo "  ok: install.sh has gh contents + raw fallback"

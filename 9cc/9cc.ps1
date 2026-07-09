@@ -88,11 +88,11 @@ function Update-9cc {
         $env:CC9_VERSION = $latest
         & $env:CC9_INSTALL_SOURCE
     } else {
-        $url = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/scripts/install.ps1"
+        $url = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/9cc/install.ps1"
         $env:CC9_VERSION = $latest
         $script = $null
         if (Get-Command gh -ErrorAction SilentlyContinue) {
-            $encoded = gh api "repos/investtal/investtal-toolchain/contents/scripts/install.ps1?ref=$latest" --jq '.content' 2>$null
+            $encoded = gh api "repos/investtal/investtal-toolchain/contents/9cc/install.ps1?ref=$latest" --jq '.content' 2>$null
             if ($encoded) {
                 $script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($encoded))
             }

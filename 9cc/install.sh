@@ -34,14 +34,14 @@ elif [ -n "$CC9_SOURCE" ]; then
 else
     fetched=0
     if command -v gh >/dev/null 2>&1; then
-        if content="$(gh api "repos/investtal/investtal-toolchain/contents/scripts/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
+        if content="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
             if [ -n "$content" ] && printf '%s' "$content" | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
                 fetched=1
             fi
         fi
     fi
     if [ "$fetched" != "1" ]; then
-        raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh"
+        raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/9cc.sh"
         curl -fsSL "$raw" -o "$CC9_HOME/9cc.sh"
     fi
 fi
