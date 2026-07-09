@@ -349,6 +349,31 @@ OUT="$(CC9_LATEST_API_FIXTURE="$API_NEW2" CC9_VERSION="v0.1.0" PATH="$GH_BIN_DIR
 assert_match "INSTALLER_RAN version=v0.2.0" "$OUT" "update decodes whitespace-laden base64"
 rm -rf "$GH_BIN_DIR" "$API_NEW2"
 
+echo "Cycle 14c: update survives a macOS-strict base64 (rejects embedded whitespace)"
+# Simulate the macOS base64 binary, which errors on line-wrapped base64. On a
+# Linux-only CI this is the only way to prove the decode path does not regress.
+SHIM_DIR="/tmp/9cc-b64-shim"; rm -rf "$SHIM_DIR"; mkdir -p "$SHIM_DIR"
+cat > "$SHIM_DIR/base64" <<'SHIMSTUB'
+#!/usr/bin/env bash
+# macOS-style: accept only single-line input; any whitespace -> fail decode.
+input="$(cat)"
+if printf '%s' "$input" | grep -q '[[:space:]]'; then exit 1; fi
+printf '%s' "$input" | /usr/bin/base64 "$@"
+SHIMSTUB
+chmod +x "$SHIM_DIR/base64"
+GH_BIN_DIR2="/tmp/9cc-update-ghbin2"
+rm -rf "$GH_BIN_DIR2"; mkdir -p "$GH_BIN_DIR2"
+cat > "$GH_BIN_DIR2/gh" <<'GHSTUB'
+#!/usr/bin/env bash
+payload=$'#!/usr/bin/env bash\necho "INSTALLER_RAN version=$CC9_VERSION"\n'
+printf '%s' "$payload" | /usr/bin/base64 | fold -w 30
+GHSTUB
+chmod +x "$GH_BIN_DIR2/gh"
+API_NEW3="/tmp/9cc-latest-new3.json"; echo '{"tag_name":"v0.2.0"}' > "$API_NEW3"
+OUT="$(CC9_LATEST_API_FIXTURE="$API_NEW3" CC9_VERSION="v0.1.0" PATH="$GH_BIN_DIR2:$SHIM_DIR:$PATH" "$CC" update 2>&1 || true)"
+assert_match "INSTALLER_RAN version=v0.2.0" "$OUT" "update decodes even with strict base64"
+rm -rf "$SHIM_DIR" "$GH_BIN_DIR2" "$API_NEW3"
+
 echo "Cycle 15: uninstall command"
 export CC9_VERSION="v0.3.5"
 export CC9_HOME=/tmp/9cc-uninstall-home
