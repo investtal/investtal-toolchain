@@ -18,8 +18,8 @@ $Script:ModelMap = [ordered]@{
     'deepseek'     = @{ Id='ds/deepseek-v4-pro';            Window='1000000' }
     'dsflash'      = @{ Id='ds/deepseek-v4-flash';          Window='1000000' }
     'kimi'         = @{ Id='kimi/kimi-k2.7';                Window='1000000' }
-    'grok'         = @{ Id='gc/grok-build';                 Window='500000' }
-    'grokcomposer' = @{ Id='gc/grok-composer-2.5-fast';     Window='500000' }
+    'grok'         = @{ Id='xai/grok-4.5';                  Window='500000' }
+    'grokcomposer' = @{ Id='xai/grok-composer-2.5-fast';    Window='500000' }
     'minimax'      = @{ Id='minimax/MiniMax-M3';            Window='1000000' }
 }
 

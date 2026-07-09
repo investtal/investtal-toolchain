@@ -20,8 +20,8 @@ get_model() {
         deepseek|ds/deepseek-v4-pro)            echo "ds/deepseek-v4-pro|1000000" ;;
         dsflash|ds/deepseek-v4-flash)           echo "ds/deepseek-v4-flash|1000000" ;;
         kimi|kimi/kimi-k2.7)                    echo "kimi/kimi-k2.7|1000000" ;;
-        grok|gc/grok-build)                     echo "gc/grok-build|500000" ;;
-        grokcomposer|gc/grok-composer-2.5-fast) echo "gc/grok-composer-2.5-fast|500000" ;;
+        grok|xai/grok-4.5)                      echo "xai/grok-4.5|500000" ;;
+        grokcomposer|xai/grok-composer-2.5-fast) echo "xai/grok-composer-2.5-fast|500000" ;;
         minimax|minimax/MiniMax-M3)             echo "minimax/MiniMax-M3|1000000" ;;
         *) return 1 ;;
     esac
@@ -82,7 +82,7 @@ list_models() {
             "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
             "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
             "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
-            "kimi|kimi/kimi-k2.7|1000000" "grok|gc/grok-build|500000" "grokcomposer|gc/grok-composer-2.5-fast|500000" \
+            "kimi|kimi/kimi-k2.7|1000000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
             "minimax|minimax/MiniMax-M3|1000000"; do
             a="${row%%|*}"; rest="${row#*|}"; id="${rest%%|*}"; win="${rest##*|}"
             entries="${entries}{\"alias\":\"$a\",\"id\":\"$id\",\"window\":$win},"
@@ -96,7 +96,7 @@ list_models() {
         "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
         "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
         "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
-        "kimi|kimi/kimi-k2.7|1000000" "grok|gc/grok-build|500000" "grokcomposer|gc/grok-composer-2.5-fast|500000" \
+        "kimi|kimi/kimi-k2.7|1000000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
         "minimax|minimax/MiniMax-M3|1000000"; do
         a="${row%%|*}"; rest="${row#*|}"; id="${rest%%|*}"; win="${rest##*|}"
         printf '%-14s %-32s %s\n' "$a" "$id" "$win"
