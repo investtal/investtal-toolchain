@@ -93,6 +93,27 @@ do_update() {
     echo "9cc updated to $latest" >&2
     echo "9cc $latest"
 }
+do_uninstall() {
+    local home="${CC9_HOME:-$HOME/.9cc}"
+    local bin
+    bin="$(command -v 9cc 2>/dev/null || true)"
+    if [ -n "$bin" ] && [ -L "$bin" ]; then
+        local target
+        target="$(readlink "$bin" 2>/dev/null || true)"
+        if [ "$target" = "$home/9cc.sh" ]; then
+            rm -f "$bin"
+            echo "removed: $bin"
+        else
+            echo "9cc uninstall: $bin does not point to $home/9cc.sh; leaving symlink" &&2
+        fi
+    fi
+    if [ -d "$home" ]; then
+        rm -rf "$home"
+        echo "removed: $home"
+    fi
+    echo "9cc uninstalled"
+}
+
 # Walks opus chain first, then the free cascade (unless --no-free). Unknown current -> exit 1.
 # ponytail: cascade hardcoded flat; extract to models.json when >2 tiers
 next_model() {
@@ -122,6 +143,7 @@ Usage:
   9cc run <alias|id> [args...]   Launch claude with that model (extra args forwarded)
   9cc next <id> [--no-free]      Print the next model in the cascade
   9cc update                     Update 9cc to the latest release
+  9cc uninstall                  Remove 9cc (home directory and PATH symlink)
   9cc version                    Print version
   9cc help                       Show this help
 Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax
@@ -196,6 +218,7 @@ main() {
         run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
         next) shift || true; [ "${1:-}" ] || { echo "9cc: missing current model. Usage: 9cc next <id> [--no-free]" >&2; return 1; }; local s; s="$(next_model "$@")" || { echo "9cc: no successor for '$1'" >&2; return 1; }; printf '%s\n' "$s" ;;
         update) do_update ;;
+        uninstall) do_uninstall ;;
         version|-v|--version) echo "9cc $CC9_VERSION" ;;
         help|-h|--help) show_help ;;
         *) echo "9cc: unknown command '$1'. Run '9cc help'." >&2; return 1 ;;

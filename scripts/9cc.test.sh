@@ -165,6 +165,17 @@ fi
 
 rm -rf "$API_UP" "$API_NEW" "$INST_DIR" /tmp/9cc-update-fail
 
+echo "Cycle 15: uninstall command"
+export CC9_HOME=/tmp/9cc-uninstall-home
+export CC9_BIN_DIR=/tmp/9cc-uninstall-bin
+rm -rf "$CC9_HOME" "$CC9_BIN_DIR"; mkdir -p "$CC9_BIN_DIR"
+CC9_SOURCE="$CC" bash "$DIR/install.sh" >/tmp/9cc-uninstall-install.log 2>&1 || { echo "  FAIL: install.sh exit $?"; cat /tmp/9cc-uninstall-install.log; FAIL=$((FAIL+1)); }
+PATH="$CC9_BIN_DIR:$PATH" "$CC" uninstall >/tmp/9cc-uninstall.log 2>&1 || true
+if [ -d "$CC9_HOME" ]; then echo "  FAIL: $CC9_HOME still exists"; FAIL=$((FAIL+1)); else echo "  ok: home removed"; PASS=$((PASS+1)); fi
+if [ -L "$CC9_BIN_DIR/9cc" ] || [ -e "$CC9_BIN_DIR/9cc" ]; then echo "  FAIL: symlink not removed"; FAIL=$((FAIL+1)); else echo "  ok: symlink removed"; PASS=$((PASS+1)); fi
+rm -rf "$CC9_HOME" "$CC9_BIN_DIR" /tmp/9cc-uninstall-install.log /tmp/9cc-uninstall.log
+unset CC9_SOURCE CC9_HOME CC9_BIN_DIR
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

@@ -95,6 +95,20 @@ Remove-Item (Join-Path $env:TEMP '9cc-latest-new.json') -ErrorAction SilentlyCon
 Remove-Item $instDir -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item Env:CC9_LATEST_API_FIXTURE, Env:CC9_VERSION -ErrorAction SilentlyContinue
 
+Write-Host "Cycle 10: uninstall command"
+$env:CC9_HOME   = Join-Path $env:TEMP '9cc-uninstall-home'
+$env:CC9_BIN_DIR = Join-Path $env:TEMP '9cc-uninstall-bin'
+Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force $env:CC9_BIN_DIR | Out-Null
+$env:CC9_SOURCE = "$DIR\9cc.ps1"
+& "$DIR\install.ps1"
+if (Test-Path $env:CC9_HOME) { Write-Host "  ok: installed"; $script:Pass++ } else { Write-Host "  FAIL: not installed"; $script:Fail++ }
+& "$DIR\9cc.ps1" uninstall 2>&1 | Out-Null
+if (-not (Test-Path $env:CC9_HOME)) { Write-Host "  ok: home removed"; $script:Pass++ } else { Write-Host "  FAIL: home still exists"; $script:Fail++ }
+if (-not (Test-Path (Join-Path $env:CC9_BIN_DIR '9cc.ps1'))) { Write-Host "  ok: bin copy removed"; $script:Pass++ } else { Write-Host "  FAIL: bin copy still exists"; $script:Fail++ }
+Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue
+Remove-Item Env:CC9_SOURCE,Env:CC9_HOME,Env:CC9_BIN_DIR -ErrorAction SilentlyContinue
+
 Write-Host "----"
 Write-Host "PASS=$script:Pass FAIL=$script:Fail"
 if ($script:Fail -ne 0) { exit 1 }

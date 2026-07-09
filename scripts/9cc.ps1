@@ -96,12 +96,31 @@ function Update-9cc {
     Write-Host "9cc $latest"
 }
 
+function Uninstall-9cc {
+    if (Test-Path $CC9Home) {
+        Remove-Item -Recurse -Force $CC9Home
+        Write-Host "removed: $CC9Home"
+    }
+    $cmd = Get-Command '9cc.ps1' -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source -and ($cmd.Source -ne $PSCommandPath)) {
+        # only remove the PATH copy if it's not the file we're currently running from
+        Remove-Item -Force $cmd.Source -ErrorAction SilentlyContinue
+        Write-Host "removed: $($cmd.Source)"
+    } elseif ($PSCommandPath -and (Test-Path $PSCommandPath) -and ($PSCommandPath -like '*9cc.ps1')) {
+        # invoked directly from the bin copy; self-remove
+        Remove-Item -Force $PSCommandPath -ErrorAction SilentlyContinue
+        Write-Host "removed: $PSCommandPath"
+    }
+    Write-Host '9cc uninstalled'
+}
+
 function Show-Help {
     Write-Host "9cc - Claude Code model switcher over 9Router"
     Write-Host "Usage:"
     Write-Host "  9cc.ps1 list                    List supported models"
     Write-Host "  9cc.ps1 run <alias|id> [args]   Launch claude with that model (extra args forwarded)"
     Write-Host "  9cc.ps1 update                  Update 9cc to the latest release"
+    Write-Host "  9cc.ps1 uninstall               Remove 9cc (home directory and PATH copy)"
     Write-Host "  9cc.ps1 version                 Print version"
     Write-Host "  9cc.ps1 help                    Show this help"
     Write-Host "Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax"
@@ -156,6 +175,7 @@ if (-not $DotSource) {
         'next' { if ($args.Count -lt 2) { Write-Error "9cc: missing current model"; exit 1 }
                  try { Get-NextModel $args[1] -NoFree:($args -contains '--no-free') } catch { Write-Error $_.Exception.Message; exit 1 } }
         'update' { Update-9cc }
+        'uninstall' { Uninstall-9cc }
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
         'run'  { if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id>"; exit 1 }
                  Invoke-Session -Key $args[1] -ExtraArgs ($args | Select-Object -Skip 2) }
