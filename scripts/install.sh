@@ -4,7 +4,7 @@
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
-CC9_VERSION="${CC9_VERSION:-v0.1.0}"
+CC9_VERSION="${CC9_VERSION:-v0.3.1}"
 CC9_SOURCE="${CC9_SOURCE:-https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
 if [ -z "${CC9_BIN_DIR:-}" ]; then
