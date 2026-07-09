@@ -85,6 +85,60 @@ elif grep -q STUB_CALLED /tmp/9cc-bogus; then echo "  FAIL: claude called on bad
 else echo "  ok: run-bogus exits 1, no claude call"; PASS=$((PASS+1)); fi
 rm -rf /tmp/9cc-test-bin "$CLAUDE_SETTINGS" /tmp/9cc-bogus
 
+echo "Cycle 6b: family-aware DEFAULT_{OPUS,SONNET,HAIKU} tiers"
+mkdir -p /tmp/9cc-test-bin
+cat > /tmp/9cc-test-bin/claude <<'STUB'
+#!/usr/bin/env bash
+echo "MODEL=$ANTHROPIC_MODEL"
+echo "OPUS=$ANTHROPIC_DEFAULT_OPUS_MODEL"
+echo "SONNET=$ANTHROPIC_DEFAULT_SONNET_MODEL"
+echo "HAIKU=$ANTHROPIC_DEFAULT_HAIKU_MODEL"
+STUB
+chmod +x /tmp/9cc-test-bin/claude
+export CLAUDE_SETTINGS=/tmp/9cc-test-settings.json
+printf '{"env":{"ANTHROPIC_BASE_URL":"https://gw.example/v1","ANTHROPIC_API_KEY":"sk-test"}}' > "$CLAUDE_SETTINGS"
+
+# Claude: fable keeps OPUS=fable; SONNET/HAIKU stay family defaults
+FABLE_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run fable 2>/dev/null || true)"
+assert_match "MODEL=cc/claude-fable-5" "$FABLE_OUT" "fable MODEL"
+assert_match "OPUS=cc/claude-fable-5" "$FABLE_OUT" "fable OPUS=fable"
+assert_match "SONNET=cc/claude-sonnet-5" "$FABLE_OUT" "fable SONNET=sonnet"
+assert_match "HAIKU=cc/claude-haiku-4-5-20251001" "$FABLE_OUT" "fable HAIKU=haiku"
+
+# Claude: non-fable (opus/sonnet/haiku) → OPUS defaults to opus-4-8
+OPUS_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run opus 2>/dev/null || true)"
+assert_match "MODEL=cc/claude-opus-4-8" "$OPUS_OUT" "opus MODEL"
+assert_match "OPUS=cc/claude-opus-4-8" "$OPUS_OUT" "opus OPUS"
+assert_match "SONNET=cc/claude-sonnet-5" "$OPUS_OUT" "opus SONNET=sonnet"
+assert_match "HAIKU=cc/claude-haiku-4-5-20251001" "$OPUS_OUT" "opus HAIKU=haiku"
+
+SONNET_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run sonnet 2>/dev/null || true)"
+assert_match "MODEL=cc/claude-sonnet-5" "$SONNET_OUT" "sonnet MODEL"
+assert_match "OPUS=cc/claude-opus-4-8" "$SONNET_OUT" "sonnet OPUS=opus default"
+assert_match "SONNET=cc/claude-sonnet-5" "$SONNET_OUT" "sonnet SONNET"
+assert_match "HAIKU=cc/claude-haiku-4-5-20251001" "$SONNET_OUT" "sonnet HAIKU"
+
+# Grok family: OPUS+SONNET=grok-4.5, HAIKU=composer
+GROK_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run grok 2>/dev/null || true)"
+assert_match "MODEL=xai/grok-4.5" "$GROK_OUT" "grok MODEL"
+assert_match "OPUS=xai/grok-4.5" "$GROK_OUT" "grok OPUS"
+assert_match "SONNET=xai/grok-4.5" "$GROK_OUT" "grok SONNET"
+assert_match "HAIKU=xai/grok-composer-2.5-fast" "$GROK_OUT" "grok HAIKU=composer"
+
+COMP_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run grokcomposer 2>/dev/null || true)"
+assert_match "MODEL=xai/grok-composer-2.5-fast" "$COMP_OUT" "composer MODEL"
+assert_match "OPUS=xai/grok-4.5" "$COMP_OUT" "composer OPUS=grok"
+assert_match "SONNET=xai/grok-4.5" "$COMP_OUT" "composer SONNET=grok"
+assert_match "HAIKU=xai/grok-composer-2.5-fast" "$COMP_OUT" "composer HAIKU"
+
+# Non-family (glm): all three stay selected id (Cycle 6 already covers; re-assert)
+GLM_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" "$CC" run glm5 2>/dev/null || true)"
+assert_match "OPUS=glm/glm-5.2" "$GLM_OUT" "glm OPUS=id"
+assert_match "SONNET=glm/glm-5.2" "$GLM_OUT" "glm SONNET=id"
+assert_match "HAIKU=glm/glm-5.2" "$GLM_OUT" "glm HAIKU=id"
+
+rm -rf /tmp/9cc-test-bin "$CLAUDE_SETTINGS"
+
 echo "Cycle 7: install.sh downloads + symlinks (fixture source)"
 export CC9_VERSION="v0.3.5"
 export CC9_SOURCE="$CC"

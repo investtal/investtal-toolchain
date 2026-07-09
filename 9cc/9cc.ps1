@@ -165,19 +165,40 @@ function Read-Setting { param([string]$Name)
     return $val
 }
 
+function Get-TierDefaults { param([string]$Id)
+    # Claude family: OPUS=fable when selected fable else opus; SONNET=sonnet; HAIKU=haiku.
+    # Grok family: OPUS+SONNET=grok-4.5; HAIKU=composer.
+    # Else: all three = selected id.
+    switch -Regex ($Id) {
+        '^(cc/claude-fable-5|cc/claude-opus-4-8|cc/claude-sonnet-5|cc/claude-haiku-4-5-20251001)$' {
+            if ($Id -eq 'cc/claude-fable-5') {
+                return @{ Opus='cc/claude-fable-5'; Sonnet='cc/claude-sonnet-5'; Haiku='cc/claude-haiku-4-5-20251001' }
+            }
+            return @{ Opus='cc/claude-opus-4-8'; Sonnet='cc/claude-sonnet-5'; Haiku='cc/claude-haiku-4-5-20251001' }
+        }
+        '^(xai/grok-4\.5|xai/grok-composer-2\.5-fast)$' {
+            return @{ Opus='xai/grok-4.5'; Sonnet='xai/grok-4.5'; Haiku='xai/grok-composer-2.5-fast' }
+        }
+        default {
+            return @{ Opus=$Id; Sonnet=$Id; Haiku=$Id }
+        }
+    }
+}
+
 function Invoke-Session { param([string]$Key,[string[]]$ExtraArgs)
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
         Write-Error "9cc: 'claude' command not found. Please install Claude Code first."; exit 1
     }
     $m = Get-Model $Key
     if (-not $m) { Write-Error "9cc: unknown model '$Key'. Run '9cc.ps1 list'."; exit 1 }
+    $tiers = Get-TierDefaults $m.Id
     $env:CLAUDE_SETTINGS = $SettingsPath
     $env:ANTHROPIC_BASE_URL = Read-Setting 'ANTHROPIC_BASE_URL'
     $env:ANTHROPIC_API_KEY   = Read-Setting 'ANTHROPIC_API_KEY'
     $env:ANTHROPIC_MODEL              = $m.Id
-    $env:ANTHROPIC_DEFAULT_OPUS_MODEL   = $m.Id
-    $env:ANTHROPIC_DEFAULT_SONNET_MODEL = $m.Id
-    $env:ANTHROPIC_DEFAULT_HAIKU_MODEL  = $m.Id
+    $env:ANTHROPIC_DEFAULT_OPUS_MODEL   = $tiers.Opus
+    $env:ANTHROPIC_DEFAULT_SONNET_MODEL = $tiers.Sonnet
+    $env:ANTHROPIC_DEFAULT_HAIKU_MODEL  = $tiers.Haiku
     $env:CLAUDE_CODE_AUTO_COMPACT_WINDOW = $m.Window
     Write-Host "9cc -> $($m.Id) (window $($m.Window))" -ForegroundColor Cyan
     if ($ExtraArgs) { & claude @ExtraArgs } else { & claude }

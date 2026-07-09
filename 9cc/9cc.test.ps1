@@ -50,6 +50,71 @@ Write-Host "  ok: re-run ok"; $script:Pass++
 Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 Remove-Item Env:CC9_SOURCE,Env:CC9_HOME,Env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 
+Write-Host "Cycle 5b: family-aware DEFAULT_{OPUS,SONNET,HAIKU} tiers"
+$stubDir = Join-Path $env:TEMP '9cc-test-bin'
+New-Item -ItemType Directory -Force $stubDir | Out-Null
+$stub = @'
+#!/usr/bin/env pwsh
+Write-Output "MODEL=$env:ANTHROPIC_MODEL"
+Write-Output "OPUS=$env:ANTHROPIC_DEFAULT_OPUS_MODEL"
+Write-Output "SONNET=$env:ANTHROPIC_DEFAULT_SONNET_MODEL"
+Write-Output "HAIKU=$env:ANTHROPIC_DEFAULT_HAIKU_MODEL"
+'@
+# Windows stub as .cmd that echoes env via powershell is heavy; use function override by PATH
+# Prefer a .ps1 shim named claude.cmd calling powershell -Command Write-Output
+$cmd = @"
+@echo off
+echo MODEL=%ANTHROPIC_MODEL%
+echo OPUS=%ANTHROPIC_DEFAULT_OPUS_MODEL%
+echo SONNET=%ANTHROPIC_DEFAULT_SONNET_MODEL%
+echo HAIKU=%ANTHROPIC_DEFAULT_HAIKU_MODEL%
+"@
+Set-Content -Path (Join-Path $stubDir 'claude.cmd') -Value $cmd -Encoding ASCII
+$settings = Join-Path $env:TEMP '9cc-test-settings.json'
+'{"env":{"ANTHROPIC_BASE_URL":"https://gw.example/v1","ANTHROPIC_API_KEY":"sk-test"}}' | Set-Content -Path $settings -Encoding UTF8
+$env:CLAUDE_SETTINGS = $settings
+$oldPath = $env:PATH
+$env:PATH = "$stubDir;$env:PATH"
+
+function Assert-Out($label, $out, $pat) {
+  if ($out -match [regex]::Escape($pat)) { Write-Host "  ok: $label"; $script:Pass++ }
+  else { Write-Host "  FAIL: $label want '$pat' got:`n$out"; $script:Fail++ }
+}
+
+$fable = & "$DIR\9cc.ps1" run fable 2>$null | Out-String
+Assert-Out 'fable MODEL' $fable 'MODEL=cc/claude-fable-5'
+Assert-Out 'fable OPUS=fable' $fable 'OPUS=cc/claude-fable-5'
+Assert-Out 'fable SONNET=sonnet' $fable 'SONNET=cc/claude-sonnet-5'
+Assert-Out 'fable HAIKU=haiku' $fable 'HAIKU=cc/claude-haiku-4-5-20251001'
+
+$opus = & "$DIR\9cc.ps1" run opus 2>$null | Out-String
+Assert-Out 'opus MODEL' $opus 'MODEL=cc/claude-opus-4-8'
+Assert-Out 'opus OPUS' $opus 'OPUS=cc/claude-opus-4-8'
+Assert-Out 'opus SONNET=sonnet' $opus 'SONNET=cc/claude-sonnet-5'
+Assert-Out 'opus HAIKU' $opus 'HAIKU=cc/claude-haiku-4-5-20251001'
+
+$grok = & "$DIR\9cc.ps1" run grok 2>$null | Out-String
+Assert-Out 'grok MODEL' $grok 'MODEL=xai/grok-4.5'
+Assert-Out 'grok OPUS' $grok 'OPUS=xai/grok-4.5'
+Assert-Out 'grok SONNET' $grok 'SONNET=xai/grok-4.5'
+Assert-Out 'grok HAIKU=composer' $grok 'HAIKU=xai/grok-composer-2.5-fast'
+
+$comp = & "$DIR\9cc.ps1" run grokcomposer 2>$null | Out-String
+Assert-Out 'composer MODEL' $comp 'MODEL=xai/grok-composer-2.5-fast'
+Assert-Out 'composer OPUS=grok' $comp 'OPUS=xai/grok-4.5'
+Assert-Out 'composer SONNET=grok' $comp 'SONNET=xai/grok-4.5'
+Assert-Out 'composer HAIKU' $comp 'HAIKU=xai/grok-composer-2.5-fast'
+
+$glm = & "$DIR\9cc.ps1" run glm5 2>$null | Out-String
+Assert-Out 'glm OPUS=id' $glm 'OPUS=glm/glm-5.2'
+Assert-Out 'glm SONNET=id' $glm 'SONNET=glm/glm-5.2'
+Assert-Out 'glm HAIKU=id' $glm 'HAIKU=glm/glm-5.2'
+
+$env:PATH = $oldPath
+Remove-Item -Recurse -Force $stubDir -ErrorAction SilentlyContinue
+Remove-Item -Force $settings -ErrorAction SilentlyContinue
+Remove-Item Env:CLAUDE_SETTINGS -ErrorAction SilentlyContinue
+
 Write-Host "Cycle 6: cascade tiers"
 $opus = Get-Cascade 'opus'
 if ($opus.Count -eq 3 -and $opus[0] -eq 'cc/claude-opus-4-8') { Write-Host "  ok: opus chain"; $script:Pass++ } else { Write-Host "  FAIL opus: $($opus -join ' ')"; $script:Fail++ }
