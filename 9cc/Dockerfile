@@ -6,7 +6,7 @@ FROM node:24-slim
 # Baseline dev tools and zsh (Claude Code shell workflows expect these).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       git ca-certificates curl less jq gh zsh \
+       git ca-certificates curl less jq zsh \
     && rm -rf /var/lib/apt/lists/*
 
 # Install proto (moonrepo toolchain manager) from scratch.
@@ -18,15 +18,17 @@ ENV PATH="/home/9cc/.proto/bin:${PATH}"
 # Create a globally writable home directory so the dynamic user has a HOME.
 RUN mkdir -p /home/9cc && chmod 777 /home/9cc
 
-# Copy Claude Code binary from the host (not npm install).
-COPY claude-local /home/9cc/.claude/local
-
 # Copy team context and Claude plugins/skills from the build context.
 # These are copied at build time, not mounted at runtime, so host paths stay hidden.
+# COPY claude comes before claude-local so the explicit local copy wins.
 COPY claude /home/9cc/.claude
 COPY investtal /home/9cc/.investtal
 COPY proto /home/9cc/.proto
 COPY prototools /home/9cc/.prototools
+
+# Copy Claude Code binary from the host (not npm install). Placed after the .claude
+# directory copy so the host local/ always wins, even if the context was not scrubbed.
+COPY claude-local /home/9cc/.claude/local
 
 # Copy zsh config if the host provided it; otherwise create minimal files.
 COPY zshrc /home/9cc/.zshrc

@@ -233,15 +233,20 @@ if (-not $DotSource) {
                  $env:ANTHROPIC_DEFAULT_SONNET_MODEL = $tiers.Sonnet
                  $env:ANTHROPIC_DEFAULT_HAIKU_MODEL  = $tiers.Haiku
                  $env:CLAUDE_CODE_AUTO_COMPACT_WINDOW = $m.Window
+                 $env:ANTHROPIC_BASE_URL = Read-Setting 'ANTHROPIC_BASE_URL'
+                 $env:ANTHROPIC_API_KEY   = Read-Setting 'ANTHROPIC_API_KEY'
                  if ($useSandbox) {
-                     . "$PSScriptRoot\sandbox.ps1"
+                     $env:CLAUDE_SETTINGS = $SettingsPath
+                     $sandboxPs1 = if (Test-Path (Join-Path $PSScriptRoot 'sandbox.ps1')) { Join-Path $PSScriptRoot 'sandbox.ps1' } else { Join-Path $CC9Home 'sandbox.ps1' }
+                     . $sandboxPs1
                      Invoke-SandboxRun @extraArgs
                  } else {
                      Invoke-Session -Key $modelKey -ExtraArgs $extraArgs
                  }
                }
         'sandbox' {
-                 . "$PSScriptRoot\sandbox.ps1"
+                 $sandboxPs1 = if (Test-Path (Join-Path $PSScriptRoot 'sandbox.ps1')) { Join-Path $PSScriptRoot 'sandbox.ps1' } else { Join-Path $CC9Home 'sandbox.ps1' }
+                 . $sandboxPs1
                  if ($args.Count -lt 2) { Write-Error "9cc sandbox: usage: 9cc.ps1 sandbox build"; exit 1 }
                  switch ($args[1]) {
                      'build' { Build-SandboxImage }

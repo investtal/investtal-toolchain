@@ -265,6 +265,11 @@ function renderMarkdown(c, audit, responseMd) {
 
 function handle(req, res) {
   const reqPath = req.url ?? "/";
+  if (reqPath === "/healthz" || reqPath === "/healthz/") {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
+    return;
+  }
   const chunks = [];
   req.on("data", (c) => chunks.push(c));
   req.on("end", () => {
@@ -305,8 +310,8 @@ function handle(req, res) {
   });
 }
 
-http.createServer(handle).listen(PORT, () => {
-  console.log(`[agent-proxy] listening on http://localhost:${PORT}`);
+http.createServer(handle).listen(PORT, "127.0.0.1", () => {
+  console.log(`[agent-proxy] listening on http://127.0.0.1:${PORT}`);
   console.log(`[agent-proxy] forwarding to ${UPSTREAM_URL.href}`);
   console.log(`[agent-proxy] point Claude Code at it:  ANTHROPIC_BASE_URL=http://localhost:${PORT} claude`);
 });

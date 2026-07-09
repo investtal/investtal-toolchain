@@ -54,12 +54,22 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
 Copy-Item $target (Join-Path $env:CC9_BIN_DIR '9cc.ps1') -Force
 
 # Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
-$srcDir = if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) { Split-Path $env:CC9_SOURCE } else { $PSScriptRoot }
-$sandboxDir = Join-Path $Home9 '9cc'
-New-Item -ItemType Directory -Force $sandboxDir | Out-Null
+$localSrc = $env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)
+$srcDir = if ($localSrc) { Split-Path $env:CC9_SOURCE } else { $PSScriptRoot }
+function Install-Asset($Name) {
+    $dst = Join-Path $Home9 $Name
+    if ($localSrc) {
+        $src = Join-Path $srcDir $Name
+        if (Test-Path $src) { Copy-Item $src $dst -Force }
+    } else {
+        $src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/9cc/$Name"
+        try { Invoke-WebRequest $src -OutFile $dst -TimeoutSec 30 -ErrorAction Stop } catch {
+            Write-Host "install: warning: could not fetch $Name from $src"
+        }
+    }
+}
 foreach ($f in @('Dockerfile', 'agent-proxy.mjs', 'sandbox-entrypoint.sh', 'sandbox.ps1')) {
-    $src = Join-Path $srcDir $f
-    if (Test-Path $src) { Copy-Item $src (Join-Path $sandboxDir $f) -Force }
+    Install-Asset $f
 }
 
 $Ver | Out-File -FilePath (Join-Path $Home9 'version') -NoNewline

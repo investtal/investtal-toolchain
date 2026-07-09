@@ -15,7 +15,7 @@ PROXY_PID=$!
 
 # Wait for proxy to listen.
 for _ in $(seq 1 30); do
-    if curl -fsS "http://localhost:$AGENT_PROXY_PORT" >/dev/null 2>&1; then break; fi
+    if curl -fsS "http://localhost:$AGENT_PROXY_PORT/healthz" >/dev/null 2>&1; then break; fi
     sleep 0.1
 done
 

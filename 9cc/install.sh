@@ -49,13 +49,20 @@ chmod +x "$CC9_HOME/9cc.sh"
 printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
 # Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
-src_dir="$(dirname "$CC9_HOME/9cc.sh")"
-if [ -n "$CC9_SOURCE" ] && [ -f "$CC9_SOURCE" ]; then
-    src_dir="$(dirname "$CC9_SOURCE")"
-fi
-mkdir -p "$CC9_HOME/9cc"
+install_asset() {
+    local name="$1" src
+    if [ -n "${CC9_SOURCE:-}" ] && [ -f "$CC9_SOURCE" ]; then
+        src="$(dirname "$CC9_SOURCE")/$name"
+        [ -f "$src" ] && cp "$src" "$CC9_HOME/$name"
+        return 0
+    fi
+    # Remote install: fetch from the same tagged tree as 9cc.sh.
+    src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/$name"
+    curl -fsSL "$src" -o "$CC9_HOME/$name" 2>/dev/null || \
+        echo "install: warning: could not fetch $name from $src" >&2
+}
 for f in Dockerfile agent-proxy.mjs sandbox-entrypoint.sh sandbox.sh; do
-    if [ -f "$src_dir/$f" ]; then cp "$src_dir/$f" "$CC9_HOME/9cc/$f"; fi
+    install_asset "$f"
 done
 
 ln -sfn "$CC9_HOME/9cc.sh" "$CC9_BIN_DIR/9cc"
