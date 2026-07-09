@@ -14,7 +14,7 @@ if [ -z "$CC9_VERSION" ]; then
             | sed -E 's/.*"([^"]+)".*/\1/' \
             | head -n1)"
     fi
-    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.0"
+    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.1"
 fi
 CC9_SOURCE="${CC9_SOURCE:-}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
@@ -35,7 +35,7 @@ else
     fetched=0
     if command -v gh >/dev/null 2>&1; then
         if content="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
-            if [ -n "$content" ] && printf '%s' "$content" | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
+            if [ -n "$content" ] && printf '%s' "$content" | tr -d '[:space:]' | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
                 fetched=1
             fi
         fi

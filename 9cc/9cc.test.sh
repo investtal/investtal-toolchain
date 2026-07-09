@@ -330,6 +330,25 @@ fi
 
 rm -rf "$API_UP" "$API_NEW" "$INST_DIR" /tmp/9cc-update-fail
 
+echo "Cycle 14b: update decodes gh base64 content with embedded whitespace"
+GH_BIN_DIR="/tmp/9cc-update-ghbin"
+rm -rf "$GH_BIN_DIR"; mkdir -p "$GH_BIN_DIR"
+# Fake gh: emit install.sh content base64-encoded with line breaks (as GitHub does).
+cat > "$GH_BIN_DIR/gh" <<'GHSTUB'
+#!/usr/bin/env bash
+# Args: api repos/.../contents/.../install.sh?ref=... --jq '.content'
+# Mimic real gh: emit ONLY the .content field (wrapped base64), as GitHub does.
+payload=$'#!/usr/bin/env bash\necho "INSTALLER_RAN version=$CC9_VERSION"\n'
+b64="$(printf '%s' "$payload" | base64 | fold -w 30)"
+printf '%s\n' "$b64"
+GHSTUB
+chmod +x "$GH_BIN_DIR/gh"
+API_NEW2="/tmp/9cc-latest-new2.json"
+echo '{"tag_name":"v0.2.0"}' > "$API_NEW2"
+OUT="$(CC9_LATEST_API_FIXTURE="$API_NEW2" CC9_VERSION="v0.1.0" PATH="$GH_BIN_DIR:$PATH" "$CC" update 2>&1 || true)"
+assert_match "INSTALLER_RAN version=v0.2.0" "$OUT" "update decodes whitespace-laden base64"
+rm -rf "$GH_BIN_DIR" "$API_NEW2"
+
 echo "Cycle 15: uninstall command"
 export CC9_VERSION="v0.3.5"
 export CC9_HOME=/tmp/9cc-uninstall-home

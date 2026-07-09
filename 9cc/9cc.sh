@@ -89,13 +89,19 @@ do_update() {
             return 1
         fi
     else
-        local script
+        local script=""
         if command -v gh >/dev/null 2>&1; then
-            script="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=$latest" --jq '.content' 2>/dev/null | base64 -d)" || return 1
-        else
-            script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || return 1
+            local b64
+            b64="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=$latest" --jq '.content' 2>/dev/null)" || b64=""
+            # GitHub returns base64 with line breaks; strip all whitespace before decoding.
+            if [ -n "$b64" ]; then
+                script="$(printf '%s' "$b64" | tr -d '[:space:]' | base64 -d 2>/dev/null)" || script=""
+            fi
         fi
-        [ -n "$script" ] || return 1
+        if [ -z "$script" ]; then
+            script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || script=""
+        fi
+        [ -n "$script" ] || { echo "9cc update: failed to fetch installer" >&2; return 1; }
         printf '%s\n' "$script" | CC9_VERSION="$latest" bash || return 1
     fi
     echo "9cc updated to $latest" >&2
