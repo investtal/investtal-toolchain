@@ -86,6 +86,7 @@ else echo "  ok: run-bogus exits 1, no claude call"; PASS=$((PASS+1)); fi
 rm -rf /tmp/9cc-test-bin "$CLAUDE_SETTINGS" /tmp/9cc-bogus
 
 echo "Cycle 7: install.sh downloads + symlinks (fixture source)"
+export CC9_VERSION="v0.3.5"
 export CC9_SOURCE="$CC"
 export CC9_HOME=/tmp/9cc-home
 export CC9_BIN_DIR=/tmp/9cc-bin
@@ -166,6 +167,7 @@ fi
 rm -rf "$API_UP" "$API_NEW" "$INST_DIR" /tmp/9cc-update-fail
 
 echo "Cycle 15: uninstall command"
+export CC9_VERSION="v0.3.5"
 export CC9_HOME=/tmp/9cc-uninstall-home
 export CC9_BIN_DIR=/tmp/9cc-uninstall-bin
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR"; mkdir -p "$CC9_BIN_DIR"

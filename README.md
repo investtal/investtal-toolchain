@@ -87,8 +87,8 @@ gh api repos/investtal/investtal-toolchain/contents/scripts/install.ps1 --jq '.c
 ```
 Pin a specific version or commit SHA via `CC9_VERSION` or by adding `?ref=<tag>` to the API path:
 ```sh
-gh api "repos/investtal/investtal-toolchain/contents/scripts/install.sh?ref=v0.3.2" --jq '.content' | base64 -d | bash
-gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.3.2 bash
+gh api "repos/investtal/investtal-toolchain/contents/scripts/install.sh?ref=v0.3.5" --jq '.content' | base64 -d | bash
+gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.3.5 bash
 gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | CC9_VERSION=<full-commit-sha> bash
 ```
 Check installed version: `9cc version`.

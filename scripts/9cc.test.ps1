@@ -36,6 +36,7 @@ $out = List-Models
 foreach ($k in $want.Keys) { if ($out -match $k) { Write-Host "  ok: list has $k"; $script:Pass++ } else { Write-Host "  FAIL: list missing $k"; $script:Fail++ } }
 
 Write-Host "Cycle 5: install.ps1 downloads (fixture source)"
+$env:CC9_VERSION = 'v0.3.5'
 $env:CC9_SOURCE = "$DIR\9cc.ps1"
 $env:CC9_HOME   = Join-Path $env:TEMP "9cc-home"
 $env:CC9_BIN_DIR = Join-Path $env:TEMP "9cc-bin"
@@ -96,6 +97,7 @@ Remove-Item $instDir -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item Env:CC9_LATEST_API_FIXTURE, Env:CC9_VERSION -ErrorAction SilentlyContinue
 
 Write-Host "Cycle 10: uninstall command"
+$env:CC9_VERSION = 'v0.3.5'
 $env:CC9_HOME   = Join-Path $env:TEMP '9cc-uninstall-home'
 $env:CC9_BIN_DIR = Join-Path $env:TEMP '9cc-uninstall-bin'
 Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue

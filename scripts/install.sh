@@ -6,11 +6,15 @@ set -euo pipefail
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
 CC9_VERSION="${CC9_VERSION:-}"
 if [ -z "$CC9_VERSION" ]; then
-    CC9_VERSION="$(curl -fsSL --max-time 10 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' 2>/dev/null \
-        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-        | sed -E 's/.*"([^"]+)".*/\1/' \
-        | head -n1)"
-    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.3.2"
+    if command -v gh >/dev/null 2>&1; then
+        CC9_VERSION="$(gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>/dev/null || true)"
+    else
+        CC9_VERSION="$(curl -fsSL --max-time 10 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' 2>/dev/null \
+            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+            | sed -E 's/.*"([^"]+)".*/\1/' \
+            | head -n1)"
+    fi
+    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.3.5"
 fi
 CC9_SOURCE="${CC9_SOURCE:-https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate

@@ -3,10 +3,17 @@
 $ErrorActionPreference = 'Stop'
 $Home9 = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $env:USERPROFILE '.9cc' }
 $Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
-    try {
-        $resp = Invoke-RestMethod -Uri 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' -TimeoutSec 10 -ErrorAction Stop
-        if ($resp -and $resp.tag_name) { $resp.tag_name } else { 'v0.3.2' }
-    } catch { 'v0.3.2' }
+    $tag = $null
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+        $tag = gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>$null
+    }
+    if (-not $tag) {
+        try {
+            $resp = Invoke-RestMethod -Uri 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' -TimeoutSec 10 -ErrorAction Stop
+            if ($resp -and $resp.tag_name) { $tag = $resp.tag_name }
+        } catch { }
+    }
+    if ($tag) { $tag } else { 'v0.3.5' }
 }
 $Src   = if ($env:CC9_SOURCE) { $env:CC9_SOURCE } else { "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/scripts/9cc.ps1" }
 if (-not $env:CC9_BIN_DIR) {

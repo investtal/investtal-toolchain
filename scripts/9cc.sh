@@ -87,7 +87,12 @@ do_update() {
         fi
     else
         local script
-        script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || return 1
+        if command -v gh >/dev/null 2>&1; then
+            script="$(gh api "repos/investtal/investtal-toolchain/contents/scripts/install.sh?ref=$latest" --jq '.content' 2>/dev/null | base64 -d)" || return 1
+        else
+            script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || return 1
+        fi
+        [ -n "$script" ] || return 1
         printf '%s\n' "$script" | CC9_VERSION="$latest" bash || return 1
     fi
     echo "9cc updated to $latest" >&2
