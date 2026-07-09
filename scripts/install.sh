@@ -4,7 +4,14 @@
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
-CC9_VERSION="${CC9_VERSION:-v0.3.2}"
+CC9_VERSION="${CC9_VERSION:-}"
+if [ -z "$CC9_VERSION" ]; then
+    CC9_VERSION="$(curl -fsSL --max-time 10 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' 2>/dev/null \
+        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | sed -E 's/.*"([^"]+)".*/\1/' \
+        | head -n1)"
+    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.3.2"
+fi
 CC9_SOURCE="${CC9_SOURCE:-https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
 if [ -z "${CC9_BIN_DIR:-}" ]; then
