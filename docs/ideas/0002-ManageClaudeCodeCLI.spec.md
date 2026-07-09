@@ -47,10 +47,10 @@ CLI launch Claude Code with dynamic model + compact-window over 9Router gateway.
 
 ## Distribution (shipped)
 
-- Launchers: `scripts/9cc.sh`, `scripts/9cc.ps1`
-- Installers: `scripts/install.sh`, `scripts/install.ps1`
-- Install (mac/linux): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.sh --jq '.content' | base64 -d | bash`
-- Install (windows): `gh api repos/investtal/investtal-toolchain/contents/scripts/install.ps1 --jq '.content' | base64 -d | powershell -c -`
+- Launchers: `9cc/9cc.sh`, `9cc/9cc.ps1`
+- Installers: `9cc/install.sh`, `9cc/install.ps1`
+- Install (mac/linux): `gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | bash`
+- Install (windows): `gh api repos/investtal/investtal-toolchain/contents/9cc/install.ps1 --jq '.content' | base64 -d | powershell -c -`
 - Pin: `?ref=<tag>` on contents path and/or `CC9_VERSION=<tag>`
 
 ## Success criteria (updated)

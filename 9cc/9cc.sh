@@ -78,7 +78,7 @@ do_update() {
         return 0
     fi
     echo "9cc update: $CC9_VERSION -> $latest" >&2
-    local install_src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/scripts/install.sh"
+    local install_src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/9cc/install.sh"
     if [ -n "${CC9_INSTALL_SOURCE:-}" ]; then
         install_src="$CC9_INSTALL_SOURCE"
         if [ -f "$install_src" ]; then
@@ -90,7 +90,7 @@ do_update() {
     else
         local script
         if command -v gh >/dev/null 2>&1; then
-            script="$(gh api "repos/investtal/investtal-toolchain/contents/scripts/install.sh?ref=$latest" --jq '.content' 2>/dev/null | base64 -d)" || return 1
+            script="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=$latest" --jq '.content' 2>/dev/null | base64 -d)" || return 1
         else
             script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || return 1
         fi
