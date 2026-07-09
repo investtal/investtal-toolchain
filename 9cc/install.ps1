@@ -13,7 +13,7 @@ $Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
             if ($resp -and $resp.tag_name) { $tag = $resp.tag_name }
         } catch { }
     }
-    if ($tag) { $tag } else { 'v0.4.0' }
+    if ($tag) { $tag } else { 'v0.4.1' }
 }
 if (-not $env:CC9_BIN_DIR) {
     $cands = @((Join-Path $env:USERPROFILE '.local\bin'), (Join-Path $env:APPDATA '9cc'), 'C:\Program Files\9cc')
