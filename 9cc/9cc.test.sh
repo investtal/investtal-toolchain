@@ -291,14 +291,35 @@ if next_model glm5 >/dev/null 2>&1; then echo "  FAIL: off-chain alias should ex
 
 echo "Cycle 13: list --json is valid JSON, 13 entries, correct shape"
 JSON="$("$CC" list --json)"
-echo "$JSON" | node -e '
-    const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
-    if (!Array.isArray(d) || d.length !== 13) { console.error("FAIL: want 13 entries, got", d.length); process.exit(1); }
-    const f = d.find(x => x.alias === "fable");
-    if (!f || f.id !== "cc/claude-fable-5" || f.window !== 1000000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
-    if (!d.every(x => typeof x.window === "number")) { console.error("FAIL: window not numeric"); process.exit(1); }
-    console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
+if command -v node >/dev/null 2>&1; then
+    echo "$JSON" | node -e '
+        const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
+        if (!Array.isArray(d) || d.length !== 13) { console.error("FAIL: want 13 entries, got", d.length); process.exit(1); }
+        const f = d.find(x => x.alias === "fable");
+        if (!f || f.id !== "cc/claude-fable-5" || f.window !== 1000000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
+        if (!d.every(x => typeof x.window === "number")) { console.error("FAIL: window not numeric"); process.exit(1); }
+        console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
+    ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
+elif command -v python3 >/dev/null 2>&1; then
+    echo "$JSON" | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+assert isinstance(d,list) and len(d)==13, ("len", len(d))
+f=[x for x in d if x["alias"]=="fable"][0]
+assert f["id"]=="cc/claude-fable-5" and f["window"]==1000000, f
+assert all(isinstance(x["window"],int) for x in d), "window not int"
+print("  ok: list --json valid, 13 entries, fable correct, windows numeric")
 ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
+else
+    # No JSON parser: validate shape via grep (array, 13 alias fields, fable entry).
+    if printf '%s' "$JSON" | grep -q '^\[{' \
+       && [ "$(printf '%s' "$JSON" | grep -o '"alias"' | wc -l)" = "13" ] \
+       && printf '%s' "$JSON" | grep -q '"alias":"fable","id":"cc/claude-fable-5"'; then
+        echo "  ok: list --json shape valid (no parser)"; PASS=$((PASS+1))
+    else
+        echo "  FAIL: list --json shape"; FAIL=$((FAIL+1))
+    fi
+fi
 
 echo "Cycle 14: update command"
 
