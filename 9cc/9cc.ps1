@@ -133,11 +133,12 @@ function Show-Help {
     Write-Host "9cc - Claude Code model switcher over 9Router"
     Write-Host "Usage:"
     Write-Host "  9cc.ps1 list                    List supported models"
-    Write-Host "  9cc.ps1 run <alias|id> [args]   Launch claude with that model (extra args forwarded)"
-    Write-Host "  9cc.ps1 update                  Update 9cc to the latest release"
-    Write-Host "  9cc.ps1 uninstall               Remove 9cc (home directory and PATH copy)"
-    Write-Host "  9cc.ps1 version                 Print version"
-    Write-Host "  9cc.ps1 help                    Show this help"
+    Write-Host "  9cc.ps1 run <alias|id> [--sandbox] [args]  Launch claude with that model (extra args forwarded)"
+    Write-Host "  9cc.ps1 sandbox build         Build the sandbox Docker image"
+    Write-Host "  9cc.ps1 update                Update 9cc to the latest release"
+    Write-Host "  9cc.ps1 uninstall             Remove 9cc (home directory and PATH copy)"
+    Write-Host "  9cc.ps1 version               Print version"
+    Write-Host "  9cc.ps1 help                  Show this help"
     Write-Host "Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax"
     Write-Host "In-session: type /model <id> (e.g. /model glm/glm-5.2) to switch without restarting."
 }
@@ -213,8 +214,40 @@ if (-not $DotSource) {
         'update' { Update-9cc }
         'uninstall' { Uninstall-9cc }
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
-        'run'  { if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id>"; exit 1 }
-                 Invoke-Session -Key $args[1] -ExtraArgs ($args | Select-Object -Skip 2) }
+        'run'  {
+                 if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id> [--sandbox]"; exit 1 }
+                 $useSandbox = $args[1] -eq '--sandbox'
+                 if ($useSandbox) {
+                     if ($args.Count -lt 3) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run --sandbox <alias|id>"; exit 1 }
+                     $modelKey = $args[2]
+                     $extraArgs = $args | Select-Object -Skip 3
+                 } else {
+                     $modelKey = $args[1]
+                     $extraArgs = $args | Select-Object -Skip 2
+                 }
+                 $m = Get-Model $modelKey
+                 if (-not $m) { Write-Error "9cc: unknown model '$modelKey'. Run '9cc.ps1 list'."; exit 1 }
+                 $tiers = Get-TierDefaults $m.Id
+                 $env:ANTHROPIC_MODEL              = $m.Id
+                 $env:ANTHROPIC_DEFAULT_OPUS_MODEL   = $tiers.Opus
+                 $env:ANTHROPIC_DEFAULT_SONNET_MODEL = $tiers.Sonnet
+                 $env:ANTHROPIC_DEFAULT_HAIKU_MODEL  = $tiers.Haiku
+                 $env:CLAUDE_CODE_AUTO_COMPACT_WINDOW = $m.Window
+                 if ($useSandbox) {
+                     . "$PSScriptRoot\sandbox.ps1"
+                     Invoke-SandboxRun @extraArgs
+                 } else {
+                     Invoke-Session -Key $modelKey -ExtraArgs $extraArgs
+                 }
+               }
+        'sandbox' {
+                 . "$PSScriptRoot\sandbox.ps1"
+                 if ($args.Count -lt 2) { Write-Error "9cc sandbox: usage: 9cc.ps1 sandbox build"; exit 1 }
+                 switch ($args[1]) {
+                     'build' { Build-SandboxImage }
+                     default { Write-Error "9cc sandbox: usage: 9cc.ps1 sandbox build"; exit 1 }
+                 }
+               }
         { $_ -in 'help','-h','--help' } { Show-Help }
         default { Write-Error "9cc: unknown command '$($args[0])'. Run '9cc.ps1 help'."; exit 1 }
     }

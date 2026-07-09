@@ -7,6 +7,24 @@ function Assert-Eq($a, $b, $label) {
     else { Write-Host "  FAIL: $label - want '$b' got '$a'"; $script:Fail++ }
 }
 . "$DIR/9cc.ps1" -DotSource
+. "$DIR/sandbox.ps1"
+
+Write-Host "Cycle sandbox-1: guard rejects home and root"
+if (Test-GuardedDir $env:USERPROFILE) { Write-Host "  FAIL: home allowed"; $script:Fail++ } else { Write-Host "  ok: home rejected"; $script:Pass++ }
+if (Test-GuardedDir 'C:\') { Write-Host "  FAIL: root allowed"; $script:Fail++ } else { Write-Host "  ok: root rejected"; $script:Pass++ }
+if (Test-GuardedDir $DIR) { Write-Host "  ok: project allowed"; $script:Pass++ } else { Write-Host "  FAIL: project rejected"; $script:Fail++ }
+
+Write-Host "Cycle sandbox-2: help text mentions sandbox"
+$help = Show-Help
+if ($help -match 'sandbox') { Write-Host "  ok: help mentions sandbox"; $script:Pass++ } else { Write-Host "  FAIL: help missing sandbox"; $script:Fail++ }
+
+Write-Host "Cycle sandbox-3: Dockerfile and agent-proxy exist"
+if ((Test-Path "$DIR\Dockerfile") -and (Test-Path "$DIR\agent-proxy.mjs") -and (Test-Path "$DIR\sandbox-entrypoint.sh") -and (Test-Path "$DIR\sandbox.ps1")) {
+    Write-Host "  ok: sandbox files present"; $script:Pass++
+} else {
+    Write-Host "  FAIL: missing sandbox files"; $script:Fail++
+}
+
 
 Write-Host "Cycle 1: registry 13 aliases"
 $want = @{

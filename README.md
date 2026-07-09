@@ -109,9 +109,18 @@ Check installed version: `9cc version`.
 9cc run minimax --resume # extra args forwarded to claude
 9cc next minimax         # print cascade successor for a model (fleet healer advances on rate-limit)
 9cc next minimax --no-free # successor excluding the free pool
+9cc sandbox build        # build the Docker image for sandbox mode
+9cc run fable --sandbox  # launch Claude Code inside a Docker sandbox (isolated home/SSH/AWS, logged egress)
 9cc version              # print version
 ```
 In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5.2`).
+
+**Sandbox mode** (`9cc run <model> --sandbox`) runs Claude Code inside a Docker container. It:
+- mounts only the current project directory as the workspace;
+- hides `~`, `~/.ssh`, `~/.aws`, and the host shell environment;
+- copies `~/.claude`, `~/.investtal`, `~/.proto`, and `~/.prototools` into the image at build time;
+- mounts `~/.claude/settings.json` read-only for auth;
+- routes Claude's outbound API/tool traffic through an in-container agent-proxy that logs every request to Markdown in `~/.9cc/egress/`.
 
 Full design: [`docs/ideas/0002-ManageClaudeCodeCLI.spec.md`](docs/ideas/0002-ManageClaudeCodeCLI.spec.md).
 Implementation plan: [`docs/plans/2026-07-08-9cc-model-switcher.md`](docs/plans/2026-07-08-9cc-model-switcher.md).

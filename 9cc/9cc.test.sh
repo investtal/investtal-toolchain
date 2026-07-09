@@ -16,6 +16,70 @@ assert_match() { # <pattern> <text> <label>
 # source registry functions (no dispatch because we source, not exec)
 source "$CC"
 
+source "$DIR/sandbox.sh" 2>/dev/null || true
+
+echo "Cycle sandbox-1: agent-proxy.mjs exists and is valid ESM"
+[ -f "$DIR/agent-proxy.mjs" ] && grep -q 'import http from "node:http"' "$DIR/agent-proxy.mjs" && \
+    { echo "  ok: agent-proxy.mjs present"; PASS=$((PASS+1)); } || \
+    { echo "  FAIL: agent-proxy.mjs missing or invalid"; FAIL=$((FAIL+1)); }
+
+echo "Cycle sandbox-2: Dockerfile stanzas"
+[ -f "$DIR/Dockerfile" ] && \
+    grep -q "FROM node:24-slim" "$DIR/Dockerfile" && \
+    grep -q "COPY claude-local" "$DIR/Dockerfile" && \
+    grep -q "COPY agent-proxy.mjs" "$DIR/Dockerfile" && \
+    grep -q "COPY investtal" "$DIR/Dockerfile" && \
+    grep -q "COPY proto" "$DIR/Dockerfile" && \
+    grep -q "COPY prototools" "$DIR/Dockerfile" && \
+    grep -q "ENTRYPOINT" "$DIR/Dockerfile" && \
+    { echo "  ok: Dockerfile stanzas"; PASS=$((PASS+1)); } || \
+    { echo "  FAIL: Dockerfile stanzas"; FAIL=$((FAIL+1)); }
+
+echo "Cycle sandbox-3: guard rejects home and root"
+if is_guarded_dir "$HOME" >/dev/null 2>&1; then echo "  FAIL: home dir allowed"; FAIL=$((FAIL+1)); else echo "  ok: home dir rejected"; PASS=$((PASS+1)); fi
+if is_guarded_dir "/" >/dev/null 2>&1; then echo "  FAIL: root dir allowed"; FAIL=$((FAIL+1)); else echo "  ok: root dir rejected"; PASS=$((PASS+1)); fi
+if is_guarded_dir "$DIR" >/dev/null 2>&1; then echo "  ok: project dir allowed"; PASS=$((PASS+1)); else echo "  FAIL: project dir rejected"; FAIL=$((FAIL+1)); fi
+
+echo "Cycle sandbox-4: 9cc sandbox build invokes docker build"
+mkdir -p /tmp/9cc-test-bin
+mkdir -p /tmp/9cc-test-home/.claude/local/bin
+mkdir -p /tmp/9cc-sandbox-ctx
+cat > /tmp/9cc-test-bin/docker <<'STUB'
+#!/usr/bin/env bash
+echo "DOCKER_BUILD args:$*"
+exit 0
+STUB
+chmod +x /tmp/9cc-test-bin/docker
+BUILD_OUT="$(PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CLAUDE_SETTINGS=/tmp/9cc-test-settings.json "$CC" sandbox build 2>&1 || true)"
+assert_match "DOCKER_BUILD" "$BUILD_OUT" "sandbox build calls docker"
+rm -rf /tmp/9cc-test-bin /tmp/9cc-test-home /tmp/9cc-sandbox-ctx
+
+echo "Cycle sandbox-5: 9cc run --sandbox invokes docker run with correct mounts"
+mkdir -p /tmp/9cc-test-bin
+mkdir -p /tmp/9cc-test-claude-local
+mkdir -p /tmp/9cc-sandbox-ctx
+mkdir -p /tmp/9cc-test-proj
+cat > /tmp/9cc-test-bin/docker <<'STUB'
+#!/usr/bin/env bash
+echo "DOCKER_RUN args:$*"
+for a in "$@"; do echo "ARG:$a"; done
+exit 0
+STUB
+chmod +x /tmp/9cc-test-bin/docker
+export CLAUDE_SETTINGS=/tmp/9cc-test-settings.json
+printf '{"env":{"ANTHROPIC_BASE_URL":"https://gw.example/v1","ANTHROPIC_API_KEY":"sk-test"}}' > "$CLAUDE_SETTINGS"
+RUN_OUT="$(cd /tmp/9cc-test-proj && PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CC9_SANDBOX_NO_BUILD=1 "$CC" run --sandbox sonnet --version 2>/dev/null || true)"
+assert_match "DOCKER_RUN" "$RUN_OUT" "run --sandbox calls docker"
+assert_match "ARG:--user" "$RUN_OUT" "docker run uses --user"
+assert_match "ARG:/workspace" "$RUN_OUT" "docker run mounts /workspace"
+assert_match "ARG:--" "$RUN_OUT" "docker run has arguments"
+rm -rf /tmp/9cc-test-bin /tmp/9cc-test-claude-local /tmp/9cc-sandbox-ctx /tmp/9cc-test-proj "$CLAUDE_SETTINGS"
+unset CLAUDE_SETTINGS
+
+echo "Cycle sandbox-6: help text mentions sandbox"
+HELP_OUT="$($CC help)"
+assert_match "sandbox" "$HELP_OUT" "help mentions sandbox"
+
 echo "Cycle 1: registry maps all 13 aliases"
 # plain list (POSIX): "alias|expected_id|expected_window" — no associative array (macOS bash 3.2)
 WANT_LIST="\

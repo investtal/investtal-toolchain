@@ -7,6 +7,7 @@ set -euo pipefail
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
 CC9_VERSION="${CC9_VERSION:-$(cat "$CC9_HOME/version" 2>/dev/null || echo 0.1.0-dev)}"
 CLAUDE_SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.
 get_model() {
@@ -147,7 +148,8 @@ show_help() {
 9cc — Claude Code model switcher over 9Router
 Usage:
   9cc list                       List supported models
-  9cc run <alias|id> [args...]   Launch claude with that model (extra args forwarded)
+  9cc run <alias|id> [--sandbox] Launch claude with that model (extra args forwarded)
+  9cc sandbox build              Build the sandbox Docker image
   9cc next <id> [--no-free]      Print the next model in the cascade
   9cc update                     Update 9cc to the latest release
   9cc uninstall                  Remove 9cc (home directory and PATH symlink)
@@ -248,7 +250,24 @@ run_session() {
 main() {
     case "${1:-help}" in
         list) shift || true; list_models "$@" ;;
-        run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
+        run)  shift || true
+         local use_sandbox=0
+         if [ "${1:-}" = "--sandbox" ]; then use_sandbox=1; shift; fi
+         [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id> [--sandbox]" >&2; return 1; }
+         if [ "$use_sandbox" = "1" ]; then
+             source "$DIR/sandbox.sh"
+             run_sandboxed "$@"
+         else
+             run_session "$@"
+         fi
+         ;;
+    sandbox) shift || true
+        source "$DIR/sandbox.sh"
+        case "${1:-}" in
+            build) shift || true; build_image ;;
+            *)     echo "9cc sandbox: usage: 9cc sandbox build" >&2; return 1 ;;
+        esac
+        ;;
         next) shift || true; [ "${1:-}" ] || { echo "9cc: missing current model. Usage: 9cc next <id> [--no-free]" >&2; return 1; }; local s; s="$(next_model "$@")" || { echo "9cc: no successor for '$1'" >&2; return 1; }; printf '%s\n' "$s" ;;
         update) do_update ;;
         uninstall) do_uninstall ;;
