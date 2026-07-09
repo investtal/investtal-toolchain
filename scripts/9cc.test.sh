@@ -135,6 +135,36 @@ echo "$JSON" | node -e '
     console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
 ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
 
+echo "Cycle 14: update command"
+
+API_UP="/tmp/9cc-latest-up.json"
+echo '{"tag_name":"v0.1.0"}' > "$API_UP"
+OUT="$(CC9_LATEST_API_FIXTURE="$API_UP" CC9_VERSION="v0.1.0" "$CC" update 2>&1 || true)"
+assert_eq "$OUT" "9cc is up to date (v0.1.0)" "update up-to-date"
+
+API_NEW="/tmp/9cc-latest-new.json"
+echo '{"tag_name":"v0.2.0"}' > "$API_NEW"
+INST_DIR="/tmp/9cc-update-install"
+rm -rf "$INST_DIR"; mkdir -p "$INST_DIR"
+cat > "$INST_DIR/install.sh" <<'STUB'
+#!/usr/bin/env bash
+echo "INSTALLER_RAN version=$CC9_VERSION"
+STUB
+chmod +x "$INST_DIR/install.sh"
+OUT="$(CC9_LATEST_API_FIXTURE="$API_NEW" CC9_VERSION="v0.1.0" CC9_INSTALL_SOURCE="$INST_DIR/install.sh" "$CC" update 2>&1 || true)"
+assert_match "INSTALLER_RAN version=v0.2.0" "$OUT" "update runs installer with new version"
+assert_match "9cc updated to v0.2.0" "$OUT" "update reports success"
+
+if CC9_LATEST_API_FIXTURE="/tmp/no-such-fixture-9cc.json" CC9_VERSION="v0.1.0" "$CC" update >/tmp/9cc-update-fail 2>&1; then
+    echo "  FAIL: update should exit 1 on API failure"; FAIL=$((FAIL+1))
+elif grep -q "9cc update: failed to reach GitHub" /tmp/9cc-update-fail; then
+    echo "  ok: update reports API failure"; PASS=$((PASS+1))
+else
+    echo "  FAIL: update did not report API failure"; cat /tmp/9cc-update-fail; FAIL=$((FAIL+1))
+fi
+
+rm -rf "$API_UP" "$API_NEW" "$INST_DIR" /tmp/9cc-update-fail
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1
