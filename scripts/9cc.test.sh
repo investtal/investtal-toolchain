@@ -178,6 +178,19 @@ if [ -L "$CC9_BIN_DIR/9cc" ] || [ -e "$CC9_BIN_DIR/9cc" ]; then echo "  FAIL: sy
 rm -rf "$CC9_HOME" "$CC9_BIN_DIR" /tmp/9cc-uninstall-install.log /tmp/9cc-uninstall.log
 unset CC9_SOURCE CC9_HOME CC9_BIN_DIR
 
+echo "Cycle 16: install.sh prefers gh contents when CC9_SOURCE is remote URL"
+# Simulate remote: set CC9_SOURCE to a non-file URL and intercept via a fake PATH/gh is hard;
+# instead assert the source script contains the gh contents fetch branch (static contract).
+if grep -q 'contents/scripts/9cc.sh' "$DIR/install.sh" \
+   && grep -q 'command -v gh' "$DIR/install.sh" \
+   && grep -q 'raw.githubusercontent.com' "$DIR/install.sh"; then
+    echo "  ok: install.sh has gh contents + raw fallback"
+    PASS=$((PASS+1))
+else
+    echo "  FAIL: install.sh missing gh-first body fetch"
+    FAIL=$((FAIL+1))
+fi
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 9cc installer — curl -fsSL <raw url>/install.sh | bash
+# 9cc installer — prefer: gh api contents | base64 -d | bash
 # Downloads 9cc.sh into ~/.9cc and symlinks `9cc` into a writable PATH dir.
 set -euo pipefail
 
@@ -16,7 +16,7 @@ if [ -z "$CC9_VERSION" ]; then
     fi
     [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.3.5"
 fi
-CC9_SOURCE="${CC9_SOURCE:-https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh}"
+CC9_SOURCE="${CC9_SOURCE:-}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
 if [ -z "${CC9_BIN_DIR:-}" ]; then
     for c in /usr/local/bin "$HOME/.local/bin"; do
@@ -27,8 +27,24 @@ if [ -z "${CC9_BIN_DIR:-}" ]; then echo "install: no writable bin dir found (set
 
 mkdir -p "$CC9_HOME" "$CC9_BIN_DIR"
 
-if [ -f "$CC9_SOURCE" ]; then cp "$CC9_SOURCE" "$CC9_HOME/9cc.sh";     # local fixture / file:// (tests)
-else curl -fsSL "$CC9_SOURCE" -o "$CC9_HOME/9cc.sh"; fi
+if [ -n "$CC9_SOURCE" ] && [ -f "$CC9_SOURCE" ]; then
+    cp "$CC9_SOURCE" "$CC9_HOME/9cc.sh"     # local fixture / tests
+elif [ -n "$CC9_SOURCE" ]; then
+    curl -fsSL "$CC9_SOURCE" -o "$CC9_HOME/9cc.sh"
+else
+    fetched=0
+    if command -v gh >/dev/null 2>&1; then
+        if content="$(gh api "repos/investtal/investtal-toolchain/contents/scripts/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
+            if [ -n "$content" ] && printf '%s' "$content" | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
+                fetched=1
+            fi
+        fi
+    fi
+    if [ "$fetched" != "1" ]; then
+        raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh"
+        curl -fsSL "$raw" -o "$CC9_HOME/9cc.sh"
+    fi
+fi
 chmod +x "$CC9_HOME/9cc.sh"
 printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
