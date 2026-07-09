@@ -37,7 +37,7 @@ COPY zshenv /home/9cc/.zshenv
 # Copy the logging proxy and container entrypoint.
 COPY agent-proxy.mjs /home/9cc/agent-proxy.mjs
 COPY sandbox-entrypoint.sh /home/9cc/sandbox-entrypoint.sh
-RUN chmod +x /home/9cc/sandbox-entrypoint.sh
+RUN chmod -R 777 /home/9cc && chmod 755 /home/9cc/sandbox-entrypoint.sh
 
 ENV HOME=/home/9cc
 ENV SHELL=/usr/bin/zsh

@@ -253,6 +253,7 @@ main() {
         run)  shift || true
          local use_sandbox=0
          if [ "${1:-}" = "--sandbox" ]; then use_sandbox=1; shift; fi
+         if [ "${2:-}" = "--sandbox" ]; then use_sandbox=1; local m="$1"; shift 2; set -- "$m" "$@"; fi
          [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id> [--sandbox]" >&2; return 1; }
          if [ "$use_sandbox" = "1" ]; then
              local props id win tiers base token opus sonnet haiku rest

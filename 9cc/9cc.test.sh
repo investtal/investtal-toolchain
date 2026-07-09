@@ -109,6 +109,11 @@ assert_match "ARG:ANTHROPIC_DEFAULT_OPUS_MODEL=cc/claude-opus-4-8" "$RUN_OUT" "p
 assert_match "ARG:ANTHROPIC_DEFAULT_HAIKU_MODEL=cc/claude-haiku-4-5-20251001" "$RUN_OUT" "passes HAIKU default"
 assert_match "ARG:claude" "$RUN_OUT" "docker run execs claude"
 assert_match "ARG:--version" "$RUN_OUT" "forwards extra args"
+# model-before-flag order: 9cc run sonnet --sandbox --version
+RUN_OUT2="$(cd /tmp/9cc-test-proj && PATH="/tmp/9cc-test-bin:$PATH" HOME=/tmp/9cc-test-home CC9_SANDBOX_CONTEXT=/tmp/9cc-sandbox-ctx CC9_SANDBOX_NO_BUILD=1 "$CC" run sonnet --sandbox --version 2>&1 || true)"
+assert_match "DOCKER_RUN" "$RUN_OUT2" "run model --sandbox calls docker"
+assert_match "ARG:ANTHROPIC_MODEL=cc/claude-sonnet-5" "$RUN_OUT2" "model-before-flag resolves model"
+assert_match "ARG:--version" "$RUN_OUT2" "model-before-flag forwards args"
 rm -rf /tmp/9cc-test-bin /tmp/9cc-test-claude-local /tmp/9cc-sandbox-ctx /tmp/9cc-test-home /tmp/9cc-test-proj "$CLAUDE_SETTINGS"
 unset CLAUDE_SETTINGS
 

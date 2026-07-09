@@ -272,6 +272,11 @@ function handle(req, res) {
   }
   const chunks = [];
   req.on("data", (c) => chunks.push(c));
+  req.on("error", (err) => {
+    console.error(`[agent-proxy] request error: ${err.message}`);
+    if (!res.headersSent) res.writeHead(400, { "content-type": "text/plain" });
+    res.end("Bad request");
+  });
   req.on("end", () => {
     const body = Buffer.concat(chunks);
     const timestamp = new Date().toISOString();
@@ -283,6 +288,11 @@ function handle(req, res) {
         res.writeHead(up.statusCode ?? 502, up.headers);
         const respChunks = [];
         up.on("data", (c) => { respChunks.push(c); res.write(c); });
+        up.on("error", (err) => {
+          console.error(`[agent-proxy] response stream error: ${err.message}`);
+          try { res.end(); } catch {}
+        });
+        res.on("error", (err) => console.error(`[agent-proxy] client response error: ${err.message}`));
         up.on("end", () => {
           res.end();
           if (isTokenCount(reqPath)) return;
