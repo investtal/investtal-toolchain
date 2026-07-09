@@ -111,6 +111,14 @@ if (-not (Test-Path (Join-Path $env:CC9_BIN_DIR '9cc.ps1'))) { Write-Host "  ok:
 Remove-Item -Recurse -Force $env:CC9_HOME,$env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 Remove-Item Env:CC9_SOURCE,Env:CC9_HOME,Env:CC9_BIN_DIR -ErrorAction SilentlyContinue
 
+Write-Host "Cycle 11: install.ps1 prefers gh contents for remote source"
+$src = Get-Content -Raw "$DIR\install.ps1"
+if ($src -match 'contents/scripts/9cc\.ps1' -and $src -match 'Get-Command gh' -and $src -match 'raw\.githubusercontent\.com') {
+    Write-Host "  ok: install.ps1 has gh contents + raw fallback"; $script:Pass++
+} else {
+    Write-Host "  FAIL: install.ps1 missing gh-first body fetch"; $script:Fail++
+}
+
 Write-Host "----"
 Write-Host "PASS=$script:Pass FAIL=$script:Fail"
 if ($script:Fail -ne 0) { exit 1 }
