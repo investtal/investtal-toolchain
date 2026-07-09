@@ -64,6 +64,37 @@ Write-Host "Cycle 8: List-Models -Json"
 $j = List-Models -Json | ConvertFrom-Json
 if ($j.Count -eq 13 -and $j[0].alias -eq 'fable') { Write-Host "  ok: json 13"; $script:Pass++ } else { Write-Host "  FAIL json"; $script:Fail++ }
 
+Write-Host "Cycle 9: update command"
+
+$env:CC9_LATEST_API_FIXTURE = "$env:TEMP\9cc-latest-up.json"
+'{"tag_name":"v0.1.0"}' | Out-File $env:CC9_LATEST_API_FIXTURE
+$env:CC9_VERSION = 'v0.1.0'
+$out = & "$DIR\9cc.ps1" update 2>&1
+if ($out -eq '9cc is up to date (v0.1.0)') { Write-Host "  ok: up-to-date"; $script:Pass++ } else { Write-Host "  FAIL: up-to-date output was $out"; $script:Fail++ }
+
+$env:CC9_LATEST_API_FIXTURE = "$env:TEMP\9cc-latest-new.json"
+'{"tag_name":"v0.2.0"}' | Out-File $env:CC9_LATEST_API_FIXTURE
+$env:CC9_VERSION = 'v0.1.0'
+$instDir = Join-Path $env:TEMP '9cc-update-install'
+New-Item -ItemType Directory -Force $instDir | Out-Null
+@'
+Write-Host "INSTALLER_RAN version=$env:CC9_VERSION"
+'@ | Out-File (Join-Path $instDir 'install.ps1')
+$env:CC9_INSTALL_SOURCE = Join-Path $instDir 'install.ps1'
+$out = & "$DIR\9cc.ps1" update *>&1
+if ($out -match "INSTALLER_RAN version=v0.2.0" -and $out -match "9cc updated to v0.2.0") { Write-Host "  ok: update runs installer"; $script:Pass++ } else { Write-Host "  FAIL: update output was $out"; $script:Fail++ }
+
+$env:CC9_LATEST_API_FIXTURE = "$env:TEMP\no-such-fixture-9cc.json"
+$err = $null
+try { & "$DIR\9cc.ps1" update *>&1 | Out-Null } catch { $err = $_ }
+if ($err -and $err -match "9cc update: failed to reach GitHub") { Write-Host "  ok: API failure reported"; $script:Pass++ } else { Write-Host "  FAIL: API failure not reported"; $script:Fail++ }
+
+Remove-Item $env:CC9_LATEST_API_FIXTURE -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $env:TEMP '9cc-latest-up.json') -ErrorAction SilentlyContinue
+Remove-Item (Join-Path $env:TEMP '9cc-latest-new.json') -ErrorAction SilentlyContinue
+Remove-Item $instDir -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item Env:CC9_LATEST_API_FIXTURE, Env:CC9_VERSION -ErrorAction SilentlyContinue
+
 Write-Host "----"
 Write-Host "PASS=$script:Pass FAIL=$script:Fail"
 if ($script:Fail -ne 0) { exit 1 }

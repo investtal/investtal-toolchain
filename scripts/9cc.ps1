@@ -45,11 +45,60 @@ function Get-NextModel { param([string]$Current,[switch]$NoFree)
     throw "9cc: no successor for '$Current'"
 }
 
+function Get-LatestTag {
+    if ($env:CC9_LATEST_API_FIXTURE -and (Test-Path $env:CC9_LATEST_API_FIXTURE)) {
+        try {
+            $resp = Get-Content -Raw $env:CC9_LATEST_API_FIXTURE | ConvertFrom-Json -ErrorAction Stop
+            return $resp.tag_name
+        } catch { return $null }
+    }
+    $api = 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest'
+    try {
+        $resp = Invoke-RestMethod -Uri $api -TimeoutSec 30 -ErrorAction Stop
+    } catch { return $null }
+    if ($resp -and $resp.tag_name -and $resp.tag_name -match '^v') {
+        return $resp.tag_name
+    }
+    return $null
+}
+
+function Update-9cc {
+    $latest = Get-LatestTag
+    if (-not $latest) {
+        throw '9cc update: failed to reach GitHub'
+    }
+    if ($latest -eq $9ccVersion) {
+        Write-Host "9cc is up to date ($9ccVersion)"
+        return
+    }
+    Write-Host "9cc update: $9ccVersion -> $latest"
+    if ($env:CC9_INSTALL_SOURCE) {
+        if (-not (Test-Path $env:CC9_INSTALL_SOURCE)) {
+            throw '9cc update: installer source not found'
+        }
+        $env:CC9_VERSION = $latest
+        & $env:CC9_INSTALL_SOURCE
+    } else {
+        $url = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/scripts/install.ps1"
+        $env:CC9_VERSION = $latest
+        try {
+            $script = Invoke-RestMethod -Uri $url -TimeoutSec 120 -ErrorAction Stop
+        } catch {
+            throw '9cc update: failed to reach GitHub'
+        }
+        $sb = [scriptblock]::Create($script)
+        & $sb
+    }
+    Write-Host "9cc updated to $latest"
+    Write-Host "9cc $latest"
+}
+
 function Show-Help {
     Write-Host "9cc - Claude Code model switcher over 9Router"
     Write-Host "Usage:"
     Write-Host "  9cc.ps1 list                    List supported models"
     Write-Host "  9cc.ps1 run <alias|id> [args]   Launch claude with that model (extra args forwarded)"
+    Write-Host "  9cc.ps1 update                  Update 9cc to the latest release"
     Write-Host "  9cc.ps1 version                 Print version"
     Write-Host "  9cc.ps1 help                    Show this help"
     Write-Host "Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax"
@@ -103,6 +152,7 @@ if (-not $DotSource) {
         'list' { List-Models -Json:($args -contains '--json') }
         'next' { if ($args.Count -lt 2) { Write-Error "9cc: missing current model"; exit 1 }
                  try { Get-NextModel $args[1] -NoFree:($args -contains '--no-free') } catch { Write-Error $_.Exception.Message; exit 1 } }
+        'update' { Update-9cc }
         { $_ -in 'version','-v','--version' } { Write-Host "9cc $9ccVersion" }
         'run'  { if ($args.Count -lt 2) { Write-Error "9cc: missing model. Usage: 9cc.ps1 run <alias|id>"; exit 1 }
                  Invoke-Session -Key $args[1] -ExtraArgs ($args | Select-Object -Skip 2) }

@@ -96,6 +96,7 @@ Check installed version: `9cc version`.
 ```sh
 9cc list                 # list models
 9cc list --json          # machine-readable registry (alias -> full id); consumed by fleet routing
+9cc update               # update 9cc to the latest release
 9cc run fable            # launch with cc/claude-fable-5
 9cc run glm/glm-5.2      # full 9Router ID also works
 9cc run minimax --resume # extra args forwarded to claude

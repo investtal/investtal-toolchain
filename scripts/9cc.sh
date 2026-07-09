@@ -37,7 +37,61 @@ cascade_for() {
     esac
 }
 
-# next_model <current> [--no-free] -> echo successor ID; exit 1 if none / unknown.
+get_latest_tag() {
+    local api="https://api.github.com/repos/investtal/investtal-toolchain/releases/latest"
+    local resp
+    if [ -n "${CC9_LATEST_API_FIXTURE:-}" ]; then
+        if [ ! -f "$CC9_LATEST_API_FIXTURE" ]; then return 1; fi
+        resp="$(cat "$CC9_LATEST_API_FIXTURE")" || return 1
+    else
+        command -v curl >/dev/null 2>&1 || { echo "9cc update: curl not found" >&2; return 1; }
+        resp="$(curl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 1
+    fi
+
+    local tag=""
+    if command -v node >/dev/null 2>&1; then
+        tag="$(printf '%s\n' "$resp" | node -e '
+            try {
+                const d = JSON.parse(require("fs").readFileSync(0, "utf8"));
+                const t = d.tag_name;
+                if (typeof t === "string" && t.length) process.stdout.write(t);
+                else process.exit(1);
+            } catch (e) { process.exit(1); }
+        ' 2>/dev/null)" || return 1
+    else
+        tag="$(printf '%s\n' "$resp" \
+            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+            | sed -E 's/.*"([^"]+)".*/\1/' \
+            | head -n1)"
+    fi
+    case "$tag" in v*) printf '%s' "$tag" ;; *) return 1 ;; esac
+}
+
+do_update() {
+    local latest
+    latest="$(get_latest_tag)" || { echo "9cc update: failed to reach GitHub" >&2; return 1; }
+    if [ "$latest" = "$CC9_VERSION" ]; then
+        echo "9cc is up to date ($CC9_VERSION)"
+        return 0
+    fi
+    echo "9cc update: $CC9_VERSION -> $latest" >&2
+    local install_src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$latest/scripts/install.sh"
+    if [ -n "${CC9_INSTALL_SOURCE:-}" ]; then
+        install_src="$CC9_INSTALL_SOURCE"
+        if [ -f "$install_src" ]; then
+            CC9_VERSION="$latest" bash "$install_src" || return 1
+        else
+            echo "9cc update: installer source not found" >&2
+            return 1
+        fi
+    else
+        local script
+        script="$(curl -fsSL --max-time 120 "$install_src" 2>/dev/null)" || return 1
+        printf '%s\n' "$script" | CC9_VERSION="$latest" bash || return 1
+    fi
+    echo "9cc updated to $latest" >&2
+    echo "9cc $latest"
+}
 # Walks opus chain first, then the free cascade (unless --no-free). Unknown current -> exit 1.
 # ponytail: cascade hardcoded flat; extract to models.json when >2 tiers
 next_model() {
@@ -66,6 +120,7 @@ Usage:
   9cc list                       List supported models
   9cc run <alias|id> [args...]   Launch claude with that model (extra args forwarded)
   9cc next <id> [--no-free]      Print the next model in the cascade
+  9cc update                     Update 9cc to the latest release
   9cc version                    Print version
   9cc help                       Show this help
 Shortcuts: fable opus sonnet haiku gpt5 glm5 glmturbo deepseek dsflash kimi grok grokcomposer minimax
@@ -139,6 +194,7 @@ main() {
         list) shift || true; list_models "$@" ;;
         run)  shift || true; [ "${1:-}" ] || { echo "9cc: missing model. Usage: 9cc run <alias|id>" >&2; return 1; }; run_session "$@" ;;
         next) shift || true; [ "${1:-}" ] || { echo "9cc: missing current model. Usage: 9cc next <id> [--no-free]" >&2; return 1; }; local s; s="$(next_model "$@")" || { echo "9cc: no successor for '$1'" >&2; return 1; }; printf '%s\n' "$s" ;;
+        update) do_update ;;
         version|-v|--version) echo "9cc $CC9_VERSION" ;;
         help|-h|--help) show_help ;;
         *) echo "9cc: unknown command '$1'. Run '9cc help'." >&2; return 1 ;;
