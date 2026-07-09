@@ -29,8 +29,8 @@ glmturbo|glm/glm-5-turbo|1000000
 deepseek|ds/deepseek-v4-pro|1000000
 dsflash|ds/deepseek-v4-flash|1000000
 kimi|kimi/kimi-k2.7|1000000
-grok|gc/grok-build|500000
-grokcomposer|gc/grok-composer-2.5-fast|500000
+grok|xai/grok-4.5|500000
+grokcomposer|xai/grok-composer-2.5-fast|500000
 minimax|minimax/MiniMax-M3|1000000"
 while IFS='|' read -r alias exp_id exp_win; do
     [ -z "$alias" ] && continue
