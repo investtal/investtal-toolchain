@@ -14,7 +14,7 @@ if [ -z "$CC9_VERSION" ]; then
             | sed -E 's/.*"([^"]+)".*/\1/' \
             | head -n1)"
     fi
-    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.3.5"
+    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.4.0"
 fi
 CC9_SOURCE="${CC9_SOURCE:-}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
