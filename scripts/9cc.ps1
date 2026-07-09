@@ -4,7 +4,10 @@
 [CmdletBinding()]
 param([switch]$DotSource)
 $ErrorActionPreference = 'Stop'
-$9ccVersion = if ($env:CC9_VERSION) { $env:CC9_VERSION } else { '0.1.0-dev' }
+$CC9Home = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $HOME '.9cc' }
+$9ccVersion = if ($env:CC9_VERSION) { $env:CC9_VERSION }
+              elseif (Test-Path (Join-Path $CC9Home 'version')) { (Get-Content (Join-Path $CC9Home 'version')).Trim() }
+              else { '0.1.0-dev' }
 $SettingsPath = if ($env:CLAUDE_SETTINGS) { $env:CLAUDE_SETTINGS } else { Join-Path ([System.Environment]::GetFolderPath('UserProfile')) '.claude\settings.json' }
 
 $Script:ModelMap = [ordered]@{

@@ -4,7 +4,8 @@
 # Usage: 9cc list | 9cc run <alias-or-id> [claude args...] | 9cc help
 set -euo pipefail
 
-CC9_VERSION="${CC9_VERSION:-0.1.0-dev}"
+CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
+CC9_VERSION="${CC9_VERSION:-$(cat "$CC9_HOME/version" 2>/dev/null || echo 0.1.0-dev)}"
 CLAUDE_SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 
 # get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.

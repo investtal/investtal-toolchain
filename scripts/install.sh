@@ -4,7 +4,7 @@
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
-CC9_VERSION="${CC9_VERSION:-v0.3.1}"
+CC9_VERSION="${CC9_VERSION:-v0.3.2}"
 CC9_SOURCE="${CC9_SOURCE:-https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/scripts/9cc.sh}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
 if [ -z "${CC9_BIN_DIR:-}" ]; then
@@ -19,6 +19,7 @@ mkdir -p "$CC9_HOME" "$CC9_BIN_DIR"
 if [ -f "$CC9_SOURCE" ]; then cp "$CC9_SOURCE" "$CC9_HOME/9cc.sh";     # local fixture / file:// (tests)
 else curl -fsSL "$CC9_SOURCE" -o "$CC9_HOME/9cc.sh"; fi
 chmod +x "$CC9_HOME/9cc.sh"
+printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
 ln -sfn "$CC9_HOME/9cc.sh" "$CC9_BIN_DIR/9cc"
 

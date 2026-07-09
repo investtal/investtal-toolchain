@@ -79,18 +79,23 @@ Launch Claude Code with a dynamic model over the 9Router gateway. Reads auth fro
 
 **Install (mac/linux/wsl):**
 ```sh
-curl -fsSL https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.3.1/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.3.2/scripts/install.sh | bash
 ```
 **Install (windows, PowerShell):**
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.3.1/scripts/install.ps1 | iex"
+powershell -c "irm https://raw.githubusercontent.com/investtal/investtal-toolchain/v0.3.2/scripts/install.ps1 | iex"
 ```
 Pin a specific version or commit SHA via `CC9_VERSION`:
 ```sh
-curl -fsSL .../install.sh | CC9_VERSION=v0.1.0 bash        # version tag
+curl -fsSL .../install.sh | CC9_VERSION=v0.3.2 bash        # version tag
 curl -fsSL .../install.sh | CC9_VERSION=<full-commit-sha> bash  # exact commit (immutable)
 ```
 Check installed version: `9cc version`.
+
+**Update:**
+```sh
+9cc update  # update to the latest release
+```
 
 **Use:**
 ```sh
