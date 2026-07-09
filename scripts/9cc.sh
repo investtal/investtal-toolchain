@@ -10,8 +10,8 @@ CLAUDE_SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 # get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.
 get_model() {
     case "$1" in
-        fable|cc/fable-5)                       echo "cc/fable-5|200000" ;;
-        opus|cc/claude-opus-4-8)                echo "cc/claude-opus-4-8|200000" ;;
+        fable|cc/claude-fable-5)                echo "cc/claude-fable-5|1000000" ;;
+        opus|cc/claude-opus-4-8)                echo "cc/claude-opus-4-8|1000000" ;;
         sonnet|cc/claude-sonnet-5)              echo "cc/claude-sonnet-5|200000" ;;
         haiku|cc/claude-haiku-4-5-20251001)     echo "cc/claude-haiku-4-5-20251001|200000" ;;
         gpt5|cx/gpt-5.5)                        echo "cx/gpt-5.5|128000" ;;
@@ -79,7 +79,7 @@ list_models() {
         # IDs/aliases contain no quote/backslash chars, so no escaping needed.
         local entries="" a id win rest
         for row in \
-            "fable|cc/fable-5|200000" "opus|cc/claude-opus-4-8|200000" "sonnet|cc/claude-sonnet-5|200000" \
+            "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
             "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
             "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
             "kimi|kimi/kimi-k2.7|1000000" "grok|gc/grok-build|500000" "grokcomposer|gc/grok-composer-2.5-fast|500000" \
@@ -93,7 +93,7 @@ list_models() {
     printf '%-14s %-32s %s\n' "ALIAS" "9ROUTER_ID" "WINDOW"
     local a id win rest
     for row in \
-        "fable|cc/fable-5|200000" "opus|cc/claude-opus-4-8|200000" "sonnet|cc/claude-sonnet-5|200000" \
+        "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
         "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
         "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
         "kimi|kimi/kimi-k2.7|1000000" "grok|gc/grok-build|500000" "grokcomposer|gc/grok-composer-2.5-fast|500000" \

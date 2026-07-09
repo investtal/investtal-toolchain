@@ -8,8 +8,8 @@ $9ccVersion = if ($env:CC9_VERSION) { $env:CC9_VERSION } else { '0.1.0-dev' }
 $SettingsPath = if ($env:CLAUDE_SETTINGS) { $env:CLAUDE_SETTINGS } else { Join-Path ([System.Environment]::GetFolderPath('UserProfile')) '.claude\settings.json' }
 
 $Script:ModelMap = [ordered]@{
-    'fable'        = @{ Id='cc/fable-5';                    Window='200000' }
-    'opus'         = @{ Id='cc/claude-opus-4-8';            Window='200000' }
+    'fable'        = @{ Id='cc/claude-fable-5';             Window='1000000' }
+    'opus'         = @{ Id='cc/claude-opus-4-8';            Window='1000000' }
     'sonnet'       = @{ Id='cc/claude-sonnet-5';            Window='200000' }
     'haiku'        = @{ Id='cc/claude-haiku-4-5-20251001';  Window='200000' }
     'gpt5'         = @{ Id='cx/gpt-5.5';                    Window='128000' }
