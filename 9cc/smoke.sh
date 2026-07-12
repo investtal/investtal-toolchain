@@ -5,7 +5,7 @@
 # API does, so the macOS-strict decode path is exercised.
 #
 # Usage:
-#   bash 9cc/smoke.sh                 # default target tag from $1 or v0.5.1
+#   bash 9cc/smoke.sh                 # default target tag from $1 or v0.5.2
 #   bash 9cc/smoke.sh <ref>           # pretend the latest release is <ref>
 # Run by hand or from CI (Jenkinsfile stage 2).
 set -euo pipefail
@@ -21,7 +21,7 @@ assert_eq() { # <actual> <expected> <label>
 
 # Pretend a previous release is installed so `update` has work to do.
 PREV_TAG="${PREV_TAG:-v0.3.5}"
-TARGET_TAG="${1:-v0.5.1}"
+TARGET_TAG="${1:-v0.5.2}"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
