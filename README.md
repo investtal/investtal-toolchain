@@ -124,6 +124,13 @@ In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5
 - refuses to run from `~` or `/`;
 - routes Claude's outbound API/tool traffic through an in-container agent-proxy that logs every request to Markdown in `~/.9cc/egress/`.
 
+**Claude install location (per machine):** sandbox no longer assumes `~/.claude/local`. Resolution order:
+1. `CC9_CLAUDE_LOCAL` — directory to copy as the image's `~/.claude/local`
+2. `CC9_CLAUDE_BIN` — single binary (staged as `local/bin/claude`)
+3. `~/.claude/local` — classic migrate-installer layout
+4. `claude` on `PATH` (e.g. `~/.local/bin/claude` → `~/.local/share/claude/versions/*`)
+5. If the host binary is not Linux-runnable (typical macOS Mach-O native install), the image **npm-installs** `@anthropic-ai/claude-code` instead so the Linux container still works
+
 Full design: [`docs/ideas/0002-ManageClaudeCodeCLI.spec.md`](docs/ideas/0002-ManageClaudeCodeCLI.spec.md).
 Implementation plan: [`docs/plans/2026-07-08-9cc-model-switcher.md`](docs/plans/2026-07-08-9cc-model-switcher.md).
 Overnight auto-pilot is deferred to a follow-up.

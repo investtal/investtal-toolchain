@@ -24,10 +24,134 @@ function Copy-IfExists {
     if (Test-Path $Source) { Copy-Item -Recurse -Force $Source $Destination }
 }
 
+function Test-IsLinuxElf {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    $fs = [System.IO.File]::OpenRead($Path)
+    try {
+        $buf = New-Object byte[] 4
+        if ($fs.Read($buf, 0, 4) -lt 4) { return $false }
+        return ($buf[0] -eq 0x7F -and $buf[1] -eq 0x45 -and $buf[2] -eq 0x4C -and $buf[3] -eq 0x46)
+    } finally { $fs.Dispose() }
+}
+
+function Test-IsContainerRunnableClaude {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+    if (Test-IsLinuxElf $Path) { return $true }
+    $fs = [System.IO.File]::OpenRead($Path)
+    try {
+        $buf = New-Object byte[] 2
+        if ($fs.Read($buf, 0, 2) -lt 2) { return $false }
+        return ($buf[0] -eq 0x23 -and $buf[1] -eq 0x21)  # #!
+    } finally { $fs.Dispose() }
+}
+
+function Resolve-FullPath {
+    param([string]$Path)
+    try { return (Resolve-Path -LiteralPath $Path).Path } catch { return $Path }
+}
+
+# Returns hashtable: @{ Kind = 'dir'|'bin'|'npm'; Path = string }
+function Find-ClaudeSource {
+    if ($env:CC9_CLAUDE_LOCAL) {
+        if (-not (Test-Path -LiteralPath $env:CC9_CLAUDE_LOCAL -PathType Container)) {
+            throw "9cc sandbox: CC9_CLAUDE_LOCAL=$($env:CC9_CLAUDE_LOCAL) is not a directory"
+        }
+        return @{ Kind = 'dir'; Path = $env:CC9_CLAUDE_LOCAL }
+    }
+
+    if ($env:CC9_CLAUDE_BIN) {
+        if (-not (Test-Path -LiteralPath $env:CC9_CLAUDE_BIN -PathType Leaf)) {
+            throw "9cc sandbox: CC9_CLAUDE_BIN=$($env:CC9_CLAUDE_BIN) not found"
+        }
+        $resolved = Resolve-FullPath $env:CC9_CLAUDE_BIN
+        if (Test-IsContainerRunnableClaude $resolved) {
+            return @{ Kind = 'bin'; Path = $resolved }
+        }
+        Write-Host "9cc sandbox: CC9_CLAUDE_BIN=$resolved is not Linux-runnable; falling back to npm install in image" -ForegroundColor Yellow
+        return @{ Kind = 'npm'; Path = '' }
+    }
+
+    $legacy = Join-Path $env:USERPROFILE '.claude\local'
+    if (Test-Path -LiteralPath $legacy -PathType Container) {
+        $candidate = $null
+        $binClaude = Join-Path $legacy 'bin\claude'
+        $flatClaude = Join-Path $legacy 'claude'
+        if (Test-Path -LiteralPath $binClaude -PathType Leaf) { $candidate = $binClaude }
+        elseif (Test-Path -LiteralPath $flatClaude -PathType Leaf) { $candidate = $flatClaude }
+        if ($candidate -and (Test-IsContainerRunnableClaude (Resolve-FullPath $candidate))) {
+            return @{ Kind = 'dir'; Path = $legacy }
+        }
+        if ($candidate) {
+            Write-Host "9cc sandbox: $legacy has a non-Linux claude binary; trying PATH / npm" -ForegroundColor Yellow
+        }
+    }
+
+    $cmd = Get-Command claude -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) {
+        $resolved = Resolve-FullPath $cmd.Source
+        if (Test-IsContainerRunnableClaude $resolved) {
+            return @{ Kind = 'bin'; Path = $resolved }
+        }
+        Write-Host "9cc sandbox: host claude at $resolved is not Linux-runnable; installing Claude Code via npm in the image" -ForegroundColor Yellow
+        return @{ Kind = 'npm'; Path = '' }
+    }
+
+    $candidates = @()
+    $localBin = Join-Path $env:USERPROFILE '.local\bin\claude'
+    if (Test-Path -LiteralPath $localBin) { $candidates += $localBin }
+    $versions = Join-Path $env:USERPROFILE '.local\share\claude\versions'
+    if (Test-Path -LiteralPath $versions) {
+        $candidates += Get-ChildItem -LiteralPath $versions -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+    }
+    foreach ($c in $candidates) {
+        $resolved = Resolve-FullPath $c
+        if (Test-IsContainerRunnableClaude $resolved) {
+            return @{ Kind = 'bin'; Path = $resolved }
+        }
+    }
+
+    Write-Host "9cc sandbox: no host Claude install found; installing Claude Code via npm in the image" -ForegroundColor Yellow
+    return @{ Kind = 'npm'; Path = '' }
+}
+
+function Stage-ClaudeLocal {
+    param([string]$ContextDir)
+    $src = Find-ClaudeSource
+    $dest = Join-Path $ContextDir 'claude-local'
+    if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }
+
+    switch ($src.Kind) {
+        'dir' {
+            Copy-Item -Recurse -Force $src.Path $dest
+            $destBin = Join-Path $dest 'bin\claude'
+            $destFlat = Join-Path $dest 'claude'
+            if (-not (Test-Path $destBin) -and (Test-Path $destFlat)) {
+                New-Item -ItemType Directory -Force (Join-Path $dest 'bin') | Out-Null
+                Copy-Item -Force $destFlat $destBin
+            }
+            Set-Content -Path (Join-Path $ContextDir 'claude-source.mode') -Value 'host' -NoNewline
+            Write-Host "9cc sandbox: using host Claude dir $($src.Path)" -ForegroundColor Cyan
+        }
+        'bin' {
+            $binDir = Join-Path $dest 'bin'
+            New-Item -ItemType Directory -Force $binDir | Out-Null
+            Copy-Item -Force $src.Path (Join-Path $binDir 'claude')
+            Set-Content -Path (Join-Path $ContextDir 'claude-source.mode') -Value 'host' -NoNewline
+            Write-Host "9cc sandbox: using host Claude binary $($src.Path)" -ForegroundColor Cyan
+        }
+        'npm' {
+            New-Item -ItemType Directory -Force $dest | Out-Null
+            Set-Content -Path (Join-Path $dest '.npm-install') -Value '# npm install inside image'
+            Set-Content -Path (Join-Path $ContextDir 'claude-source.mode') -Value 'npm' -NoNewline
+        }
+        default { throw "9cc sandbox: internal error: unknown claude source kind '$($src.Kind)'" }
+    }
+}
+
 function Build-SandboxImage {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw '9cc sandbox: docker not found' }
-    $claudeLocal = Join-Path $env:USERPROFILE '.claude\local'
-    if (-not (Test-Path $claudeLocal)) { throw "9cc sandbox: $claudeLocal not found; install Claude Code first" }
 
     # Guard: only wipe our own managed context dir to avoid data loss if user overrides CC9_SANDBOX_CONTEXT.
     $homeNorm = (Resolve-Path $CC9Home).Path
@@ -36,7 +160,7 @@ function Build-SandboxImage {
     if (Test-Path $SandboxContext) { Remove-Item -Recurse -Force $SandboxContext }
     New-Item -ItemType Directory -Force $SandboxContext | Out-Null
 
-    Copy-IfExists $claudeLocal (Join-Path $SandboxContext 'claude-local')
+    Stage-ClaudeLocal -ContextDir $SandboxContext
     Copy-IfExists (Join-Path $env:USERPROFILE '.claude') (Join-Path $SandboxContext 'claude')
     # Never bake secrets or the host binary into image layers; both are supplied at runtime.
     Remove-Item -Recurse -Force (Join-Path $SandboxContext 'claude\settings.json') -ErrorAction SilentlyContinue

@@ -30,6 +30,8 @@ echo "Cycle sandbox-2: Dockerfile stanzas"
 [ -f "$DIR/Dockerfile" ] && \
     grep -q "FROM node:24-slim" "$DIR/Dockerfile" && \
     grep -q "COPY claude-local" "$DIR/Dockerfile" && \
+    grep -q "COPY claude-source.mode" "$DIR/Dockerfile" && \
+    grep -q '@anthropic-ai/claude-code' "$DIR/Dockerfile" && \
     grep -q "COPY agent-proxy.mjs" "$DIR/Dockerfile" && \
     grep -q "COPY investtal" "$DIR/Dockerfile" && \
     grep -q "COPY proto" "$DIR/Dockerfile" && \
@@ -48,9 +50,44 @@ if is_guarded_dir "$HOME" >/dev/null 2>&1; then echo "  FAIL: home dir allowed";
 if is_guarded_dir "/" >/dev/null 2>&1; then echo "  FAIL: root dir allowed"; FAIL=$((FAIL+1)); else echo "  ok: root dir rejected"; PASS=$((PASS+1)); fi
 if is_guarded_dir "$DIR" >/dev/null 2>&1; then echo "  ok: project dir allowed"; PASS=$((PASS+1)); else echo "  FAIL: project dir rejected"; FAIL=$((FAIL+1)); fi
 
+echo "Cycle sandbox-3b: find_claude_source resolves CC9_CLAUDE_LOCAL / BIN / npm"
+mkdir -p /tmp/9cc-claude-dir/bin
+printf '#!/bin/sh\necho claude-stub\n' > /tmp/9cc-claude-dir/bin/claude
+chmod +x /tmp/9cc-claude-dir/bin/claude
+SRC="$(CC9_CLAUDE_LOCAL=/tmp/9cc-claude-dir find_claude_source)"
+assert_eq "$SRC" "dir|/tmp/9cc-claude-dir" "CC9_CLAUDE_LOCAL dir"
+printf '#!/bin/sh\necho bin-stub\n' > /tmp/9cc-claude-bin
+chmod +x /tmp/9cc-claude-bin
+SRC="$(CC9_CLAUDE_BIN=/tmp/9cc-claude-bin find_claude_source)"
+SRC_KIND="${SRC%%|*}"
+SRC_PATH="${SRC#*|}"
+if [ "$SRC_KIND" = "bin" ] && { [ "$SRC_PATH" = "/tmp/9cc-claude-bin" ] || [ "$SRC_PATH" = "/private/tmp/9cc-claude-bin" ]; }; then
+    echo "  ok: CC9_CLAUDE_BIN shebang"; PASS=$((PASS+1))
+else
+    echo "  FAIL: CC9_CLAUDE_BIN shebang — got '$SRC'"; FAIL=$((FAIL+1))
+fi
+# Mach-O-like non-runnable binary -> npm
+printf '\xcf\xfa\xed\xfe' > /tmp/9cc-claude-macho
+SRC="$(CC9_CLAUDE_BIN=/tmp/9cc-claude-macho find_claude_source 2>/dev/null)"
+assert_eq "$SRC" "npm|" "non-Linux binary falls back to npm"
+# stage_claude_local writes mode file
+rm -rf /tmp/9cc-stage-ctx
+mkdir -p /tmp/9cc-stage-ctx
+CC9_CLAUDE_LOCAL=/tmp/9cc-claude-dir stage_claude_local /tmp/9cc-stage-ctx
+assert_eq "$(cat /tmp/9cc-stage-ctx/claude-source.mode)" "host" "stage host mode"
+[ -x /tmp/9cc-stage-ctx/claude-local/bin/claude ] && { echo "  ok: staged bin/claude"; PASS=$((PASS+1)); } || { echo "  FAIL: staged bin/claude missing"; FAIL=$((FAIL+1)); }
+rm -rf /tmp/9cc-stage-ctx
+CC9_CLAUDE_BIN=/tmp/9cc-claude-macho stage_claude_local /tmp/9cc-stage-ctx 2>/dev/null
+assert_eq "$(cat /tmp/9cc-stage-ctx/claude-source.mode)" "npm" "stage npm mode"
+rm -rf /tmp/9cc-claude-dir /tmp/9cc-claude-bin /tmp/9cc-claude-macho /tmp/9cc-stage-ctx
+unset CC9_CLAUDE_LOCAL CC9_CLAUDE_BIN 2>/dev/null || true
+
 echo "Cycle sandbox-4: 9cc sandbox build invokes docker build and scrubs secrets"
 mkdir -p /tmp/9cc-test-bin
 mkdir -p /tmp/9cc-test-home/.claude/local/bin
+# Runnable shebang so classic ~/.claude/local layout is host-copyable.
+printf '#!/bin/sh\necho claude-test\n' > /tmp/9cc-test-home/.claude/local/bin/claude
+chmod +x /tmp/9cc-test-home/.claude/local/bin/claude
 mkdir -p /tmp/9cc-test-home/.claude/secrets
 touch /tmp/9cc-test-home/.claude/settings.json
 cat > /tmp/9cc-test-bin/docker <<'STUB'
@@ -70,6 +107,16 @@ if [ -d /tmp/9cc-sandbox-ctx/claude/local ]; then
     echo "  FAIL: host binary baked into context"; FAIL=$((FAIL+1));
 else
     echo "  ok: host binary scrubbed from context"; PASS=$((PASS+1));
+fi
+if [ -f /tmp/9cc-sandbox-ctx/claude-source.mode ]; then
+    echo "  ok: claude-source.mode present"; PASS=$((PASS+1));
+else
+    echo "  FAIL: claude-source.mode missing"; FAIL=$((FAIL+1));
+fi
+if [ -x /tmp/9cc-sandbox-ctx/claude-local/bin/claude ]; then
+    echo "  ok: claude-local staged from host"; PASS=$((PASS+1));
+else
+    echo "  FAIL: claude-local not staged"; FAIL=$((FAIL+1));
 fi
 # Refuse to wipe an unmanaged CC9_SANDBOX_CONTEXT (data-loss guard).
 BAD_CTX="$DIR/9cc-test-bad-ctx"
