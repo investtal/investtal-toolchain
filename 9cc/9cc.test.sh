@@ -442,6 +442,101 @@ OUT="$(CC9_LATEST_API_FIXTURE="$API_NEW3" CC9_VERSION="v0.1.0" PATH="$GH_BIN_DIR
 assert_match "INSTALLER_RAN version=v0.2.0" "$OUT" "update decodes even with strict base64"
 rm -rf "$SHIM_DIR" "$GH_BIN_DIR2" "$API_NEW3"
 
+echo "Cycle 14d: install.sh uses atomic temp+mv for launcher (self-update safety)"
+if grep -q 'atomic_install' "$DIR/install.sh" \
+   && grep -q 'mktemp' "$DIR/install.sh" \
+   && grep -q 'mv -f' "$DIR/install.sh" \
+   && ! grep -E 'base64 -d > "\$CC9_HOME/9cc\.sh"' "$DIR/install.sh"; then
+    echo "  ok: install.sh uses atomic install (no in-place truncate of launcher)"; PASS=$((PASS+1))
+else
+    echo "  FAIL: install.sh missing atomic launcher install"; FAIL=$((FAIL+1))
+fi
+if grep -q 'exit 0' "$DIR/9cc.sh" \
+   && awk '/^do_update\(\)/,/^do_uninstall\(\)/' "$DIR/9cc.sh" | grep -q 'exit 0'; then
+    echo "  ok: do_update exits after successful install"; PASS=$((PASS+1))
+else
+    echo "  FAIL: do_update does not exit after install"; FAIL=$((FAIL+1))
+fi
+
+echo "Cycle 14e: live self-overwrite — update replaces running 9cc.sh without syntax error"
+# Repro for macOS bash 3.2: overwriting the executing script in place corrupts the
+# parse stream ("syntax error near ;;"). Real install.sh must replace atomically,
+# and do_update must complete cleanly while the old process is still alive.
+SO_WORK=/tmp/9cc-self-overwrite
+rm -rf "$SO_WORK"
+mkdir -p "$SO_WORK/home" "$SO_WORK/bin"
+# Seed an "installed" copy of the current launcher (this is the running file).
+cp "$CC" "$SO_WORK/home/9cc.sh"
+chmod +x "$SO_WORK/home/9cc.sh"
+printf 'v0.1.0\n' > "$SO_WORK/home/version"
+ln -sfn "$SO_WORK/home/9cc.sh" "$SO_WORK/bin/9cc"
+# New payload: same launcher but with a trailing comment so content length differs.
+cp "$CC" "$SO_WORK/new-9cc.sh"
+printf '\n# self-overwrite-marker v0.2.0\n' >> "$SO_WORK/new-9cc.sh"
+API_SO="$SO_WORK/latest.json"
+echo '{"tag_name":"v0.2.0"}' > "$API_SO"
+set +e
+SO_OUT="$(
+  CC9_HOME="$SO_WORK/home" \
+  CC9_BIN_DIR="$SO_WORK/bin" \
+  CC9_VERSION="v0.1.0" \
+  CC9_LATEST_API_FIXTURE="$API_SO" \
+  CC9_INSTALL_SOURCE="$DIR/install.sh" \
+  CC9_SOURCE="$SO_WORK/new-9cc.sh" \
+  PATH="$SO_WORK/bin:$PATH" \
+  "$SO_WORK/bin/9cc" update 2>&1
+)"
+SO_EC=$?
+set -e
+if [ "$SO_EC" -eq 0 ] \
+   && ! echo "$SO_OUT" | grep -qi 'syntax error' \
+   && echo "$SO_OUT" | grep -q '9cc updated to v0.2.0' \
+   && echo "$SO_OUT" | grep -q '9cc v0.2.0' \
+   && grep -q 'self-overwrite-marker' "$SO_WORK/home/9cc.sh" \
+   && [ "$(cat "$SO_WORK/home/version")" = "v0.2.0" ]; then
+    echo "  ok: self-overwrite update completes without syntax error"; PASS=$((PASS+1))
+else
+    echo "  FAIL: self-overwrite update broken (ec=$SO_EC)"; echo "$SO_OUT"; FAIL=$((FAIL+1))
+fi
+# Negative control: in-place truncate of a running script must produce the classic error
+# (documents why atomic install is required; skips if bash fully buffers the script).
+NEG="$SO_WORK/neg.sh"
+cat > "$NEG" <<'NEGS'
+#!/usr/bin/env bash
+set -euo pipefail
+# pad so mid-file rewrite lands past the overwrite point
+x=1
+# OVERWRITE_POINT
+echo BEFORE_OVERWRITE
+# Truncate+rewrite this same file while running (old broken installer behaviour).
+cat > "$0" <<'NEW'
+#!/usr/bin/env bash
+echo REPLACED_CONTENT
+NEW
+# More statements bash must re-read after the rewrite — often "syntax error".
+case x in
+  x) echo AFTER_CASE ;;
+  *) echo NOPE ;;
+esac
+echo AFTER_OVERWRITE
+NEGS
+chmod +x "$NEG"
+set +e
+NEG_OUT="$(bash "$NEG" 2>&1)"
+NEG_EC=$?
+set -e
+if echo "$NEG_OUT" | grep -qi 'syntax error' || [ "$NEG_EC" -ne 0 ]; then
+    echo "  ok: negative control — in-place self-overwrite is unsafe (ec=$NEG_EC)"; PASS=$((PASS+1))
+else
+    # Some bash builds fully buffer short scripts; still record as skip-ok if AFTER never prints.
+    if echo "$NEG_OUT" | grep -q 'AFTER_OVERWRITE'; then
+        echo "  FAIL: negative control did not break (bash fully buffered?)"; echo "$NEG_OUT"; FAIL=$((FAIL+1))
+    else
+        echo "  ok: negative control — in-place overwrite disrupted execution"; PASS=$((PASS+1))
+    fi
+fi
+rm -rf "$SO_WORK"
+
 echo "Cycle 15: uninstall command"
 export CC9_VERSION="v0.3.5"
 export CC9_HOME=/tmp/9cc-uninstall-home

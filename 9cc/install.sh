@@ -14,7 +14,7 @@ if [ -z "$CC9_VERSION" ]; then
             | sed -E 's/.*"([^"]+)".*/\1/' \
             | head -n1)"
     fi
-    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.2"
+    [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.3"
 fi
 CC9_SOURCE="${CC9_SOURCE:-}"
 # prefer explicit CC9_BIN_DIR, else first writable candidate
@@ -27,22 +27,46 @@ if [ -z "${CC9_BIN_DIR:-}" ]; then echo "install: no writable bin dir found (set
 
 mkdir -p "$CC9_HOME" "$CC9_BIN_DIR"
 
+# Write via temp file + rename so an in-flight `9cc update` (which is executing
+# the previous ~/.9cc/9cc.sh inode) is not corrupted by an in-place truncate.
+# In-place `> file` reuses the inode; bash 3.2 re-reads it mid-script → syntax errors.
+atomic_install() {
+    local dest="$1"
+    local dir tmp
+    dir="$(dirname "$dest")"
+    mkdir -p "$dir"
+    tmp="$(mktemp "${dir}/.9cc-install.XXXXXX")" || return 1
+    # Caller left payload on stdin.
+    cat > "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$dest"
+}
+
 if [ -n "$CC9_SOURCE" ] && [ -f "$CC9_SOURCE" ]; then
-    cp "$CC9_SOURCE" "$CC9_HOME/9cc.sh"     # local fixture / tests
+    atomic_install "$CC9_HOME/9cc.sh" < "$CC9_SOURCE"
 elif [ -n "$CC9_SOURCE" ]; then
-    curl -fsSL "$CC9_SOURCE" -o "$CC9_HOME/9cc.sh"
+    tmp="$(mktemp "${CC9_HOME}/.9cc-install.XXXXXX")"
+    curl -fsSL "$CC9_SOURCE" -o "$tmp"
+    mv -f "$tmp" "$CC9_HOME/9cc.sh"
 else
     fetched=0
     if command -v gh >/dev/null 2>&1; then
         if content="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.sh?ref=$CC9_VERSION" --jq '.content' 2>/dev/null)"; then
-            if [ -n "$content" ] && printf '%s' "$content" | tr -d '[:space:]' | base64 -d > "$CC9_HOME/9cc.sh" 2>/dev/null; then
-                fetched=1
+            if [ -n "$content" ]; then
+                tmp="$(mktemp "${CC9_HOME}/.9cc-install.XXXXXX")"
+                if printf '%s' "$content" | tr -d '[:space:]' | base64 -d > "$tmp" 2>/dev/null; then
+                    mv -f "$tmp" "$CC9_HOME/9cc.sh"
+                    fetched=1
+                else
+                    rm -f "$tmp"
+                fi
             fi
         fi
     fi
     if [ "$fetched" != "1" ]; then
         raw="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/9cc.sh"
-        curl -fsSL "$raw" -o "$CC9_HOME/9cc.sh"
+        tmp="$(mktemp "${CC9_HOME}/.9cc-install.XXXXXX")"
+        curl -fsSL "$raw" -o "$tmp"
+        mv -f "$tmp" "$CC9_HOME/9cc.sh"
     fi
 fi
 chmod +x "$CC9_HOME/9cc.sh"
@@ -50,16 +74,23 @@ printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
 # Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
 install_asset() {
-    local name="$1" src
+    local name="$1" src tmp
     if [ -n "${CC9_SOURCE:-}" ] && [ -f "$CC9_SOURCE" ]; then
         src="$(dirname "$CC9_SOURCE")/$name"
-        [ -f "$src" ] && cp "$src" "$CC9_HOME/$name"
+        if [ -f "$src" ]; then
+            atomic_install "$CC9_HOME/$name" < "$src"
+        fi
         return 0
     fi
     # Remote install: fetch from the same tagged tree as 9cc.sh.
     src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/$name"
-    curl -fsSL "$src" -o "$CC9_HOME/$name" 2>/dev/null || \
+    tmp="$(mktemp "${CC9_HOME}/.9cc-install.XXXXXX")"
+    if curl -fsSL "$src" -o "$tmp" 2>/dev/null; then
+        mv -f "$tmp" "$CC9_HOME/$name"
+    else
+        rm -f "$tmp"
         echo "install: warning: could not fetch $name from $src" >&2
+    fi
 }
 for f in Dockerfile agent-proxy.mjs sandbox-entrypoint.sh sandbox.sh; do
     install_asset "$f"

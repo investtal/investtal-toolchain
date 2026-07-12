@@ -13,7 +13,7 @@ $Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
             if ($resp -and $resp.tag_name) { $tag = $resp.tag_name }
         } catch { }
     }
-    if ($tag) { $tag } else { 'v0.5.2' }
+    if ($tag) { $tag } else { 'v0.5.3' }
 }
 if (-not $env:CC9_BIN_DIR) {
     $cands = @((Join-Path $env:USERPROFILE '.local\bin'), (Join-Path $env:APPDATA '9cc'), 'C:\Program Files\9cc')
@@ -31,23 +31,30 @@ if (-not $env:CC9_BIN_DIR) { throw "install: no writable bin dir (set CC9_BIN_DI
 
 New-Item -ItemType Directory -Force $Home9 | Out-Null
 $target = Join-Path $Home9 '9cc.ps1'
+# Write to a temp file then Move-Item so a running update process is not truncated in place.
+function Install-AtomicFile([string]$Dest, [scriptblock]$Writer) {
+    $dir = Split-Path -Parent $Dest
+    $tmp = Join-Path $dir ('.9cc-install.' + [guid]::NewGuid().ToString('N'))
+    & $Writer $tmp
+    Move-Item -LiteralPath $tmp -Destination $Dest -Force
+}
 if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
-    Copy-Item $env:CC9_SOURCE $target -Force      # local fixture (tests)
+    Install-AtomicFile $target { param($t) Copy-Item $env:CC9_SOURCE $t -Force }
 } elseif ($env:CC9_SOURCE) {
-    Invoke-WebRequest $env:CC9_SOURCE -OutFile $target
+    Install-AtomicFile $target { param($t) Invoke-WebRequest $env:CC9_SOURCE -OutFile $t }
 } else {
     $fetched = $false
     if (Get-Command gh -ErrorAction SilentlyContinue) {
         $encoded = gh api "repos/investtal/investtal-toolchain/contents/9cc/9cc.ps1?ref=$Ver" --jq '.content' 2>$null
         if ($encoded) {
             $bytes = [System.Convert]::FromBase64String(($encoded -replace '\s',''))
-            [System.IO.File]::WriteAllBytes($target, $bytes)
+            Install-AtomicFile $target { param($t) [System.IO.File]::WriteAllBytes($t, $bytes) }
             $fetched = $true
         }
     }
     if (-not $fetched) {
         $Src = "https://raw.githubusercontent.com/investtal/investtal-toolchain/$Ver/9cc/9cc.ps1"
-        Invoke-WebRequest $Src -OutFile $target
+        Install-AtomicFile $target { param($t) Invoke-WebRequest $Src -OutFile $t }
     }
 }
 

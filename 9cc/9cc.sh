@@ -106,6 +106,10 @@ do_update() {
     fi
     echo "9cc updated to $latest" >&2
     echo "9cc $latest"
+    # Installer replaces ~/.9cc/9cc.sh. Even with atomic rename, exit so we never
+    # continue parsing this process's script stream after a self-update
+    # (bash 3.2 on macOS: in-place truncate → "syntax error near ;;").
+    exit 0
 }
 do_uninstall() {
     local home="${CC9_HOME:-$HOME/.9cc}"
