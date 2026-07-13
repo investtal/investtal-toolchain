@@ -28,13 +28,13 @@ if ((Test-Path "$DIR\Dockerfile") -and (Test-Path "$DIR\agent-proxy.mjs") -and (
 
 Write-Host "Cycle 1: registry 13 aliases"
 $want = @{
-  fable=@{Id='cc/claude-fable-5';Window='1000000'}; opus=@{Id='cc/claude-opus-4-8';Window='1000000'}
+  fable=@{Id='cc/claude-fable-5';Window='500000'}; opus=@{Id='cc/claude-opus-4-8';Window='500000'}
   sonnet=@{Id='cc/claude-sonnet-5';Window='200000'}; haiku=@{Id='cc/claude-haiku-4-5-20251001';Window='200000'}
-  gpt5=@{Id='cx/gpt-5.5';Window='128000'}; glm5=@{Id='glm/glm-5.2';Window='1000000'}
-  glmturbo=@{Id='glm/glm-5-turbo';Window='1000000'}; deepseek=@{Id='ds/deepseek-v4-pro';Window='1000000'}
-  dsflash=@{Id='ds/deepseek-v4-flash';Window='1000000'}; kimi=@{Id='kimi/kimi-k2.7';Window='1000000'}
+  gpt5=@{Id='cx/gpt-5.5';Window='128000'}; glm5=@{Id='glm/glm-5.2';Window='500000'}
+  glmturbo=@{Id='glm/glm-5-turbo';Window='500000'}; deepseek=@{Id='ds/deepseek-v4-pro';Window='500000'}
+  dsflash=@{Id='ds/deepseek-v4-flash';Window='500000'}; kimi=@{Id='kimi/kimi-k2.7';Window='500000'}
   grok=@{Id='xai/grok-4.5';Window='500000'}; grokcomposer=@{Id='xai/grok-composer-2.5-fast';Window='500000'}
-  minimax=@{Id='minimax/MiniMax-M3';Window='1000000'}
+  minimax=@{Id='minimax/MiniMax-M3';Window='500000'}
 }
 foreach ($k in $want.Keys) {
     $m = Get-Model $k

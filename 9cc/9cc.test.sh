@@ -171,28 +171,28 @@ assert_match "sandbox" "$HELP_OUT" "help mentions sandbox"
 echo "Cycle 1: registry maps all 13 aliases"
 # plain list (POSIX): "alias|expected_id|expected_window" — no associative array (macOS bash 3.2)
 WANT_LIST="\
-fable|cc/claude-fable-5|1000000
-opus|cc/claude-opus-4-8|1000000
+fable|cc/claude-fable-5|500000
+opus|cc/claude-opus-4-8|500000
 sonnet|cc/claude-sonnet-5|200000
 haiku|cc/claude-haiku-4-5-20251001|200000
 gpt5|cx/gpt-5.5|128000
-glm5|glm/glm-5.2|1000000
-glmturbo|glm/glm-5-turbo|1000000
-deepseek|ds/deepseek-v4-pro|1000000
-dsflash|ds/deepseek-v4-flash|1000000
-kimi|kimi/kimi-k2.7|1000000
+glm5|glm/glm-5.2|500000
+glmturbo|glm/glm-5-turbo|500000
+deepseek|ds/deepseek-v4-pro|500000
+dsflash|ds/deepseek-v4-flash|500000
+kimi|kimi/kimi-k2.7|500000
 grok|xai/grok-4.5|500000
 grokcomposer|xai/grok-composer-2.5-fast|500000
-minimax|minimax/MiniMax-M3|1000000"
+minimax|minimax/MiniMax-M3|500000"
 while IFS='|' read -r alias exp_id exp_win; do
     [ -z "$alias" ] && continue
     assert_eq "$(get_model "$alias")" "$exp_id|$exp_win" "alias $alias"
 done <<<"$WANT_LIST"
 
 echo "Cycle 2: full-ID resolves to same id|window"
-assert_eq "$(get_model 'glm/glm-5.2')"           "glm/glm-5.2|1000000" "full glm"
-assert_eq "$(get_model 'cc/claude-fable-5')"     "cc/claude-fable-5|1000000"   "full fable"
-assert_eq "$(get_model 'minimax/MiniMax-M3')"    "minimax/MiniMax-M3|1000000" "full minimax"
+assert_eq "$(get_model 'glm/glm-5.2')"           "glm/glm-5.2|500000" "full glm"
+assert_eq "$(get_model 'cc/claude-fable-5')"     "cc/claude-fable-5|500000"   "full fable"
+assert_eq "$(get_model 'minimax/MiniMax-M3')"    "minimax/MiniMax-M3|500000" "full minimax"
 
 echo "Cycle 3: unknown alias exits non-zero"
 if get_model 'nope' >/dev/null 2>&1; then echo "  FAIL: unknown should exit 1"; FAIL=$((FAIL+1)); else echo "  ok: unknown exits 1"; PASS=$((PASS+1)); fi
@@ -229,7 +229,7 @@ assert_match "MODEL=glm/glm-5.2" "$RUN_OUT" "run sets ANTHROPIC_MODEL"
 assert_match "OPUS=glm/glm-5.2"  "$RUN_OUT" "run sets OPUS_MODEL"
 assert_match "SONNET=glm/glm-5.2" "$RUN_OUT" "run sets SONNET_MODEL"
 assert_match "HAIKU=glm/glm-5.2" "$RUN_OUT" "run sets HAIKU_MODEL"
-assert_match "WIN=1000000"       "$RUN_OUT" "run sets compact window"
+assert_match "WIN=500000"       "$RUN_OUT" "run sets compact window"
 assert_match "args:--resume extra" "$RUN_OUT" "run forwards extra args"
 if PATH="/tmp/9cc-test-bin:$PATH" "$CC" run bogus >/tmp/9cc-bogus 2>&1; then
     echo "  FAIL: run-bogus should exit 1"; FAIL=$((FAIL+1));
@@ -343,7 +343,7 @@ if command -v node >/dev/null 2>&1; then
         const d = JSON.parse(require("fs").readFileSync(0,"utf8"));
         if (!Array.isArray(d) || d.length !== 13) { console.error("FAIL: want 13 entries, got", d.length); process.exit(1); }
         const f = d.find(x => x.alias === "fable");
-        if (!f || f.id !== "cc/claude-fable-5" || f.window !== 1000000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
+        if (!f || f.id !== "cc/claude-fable-5" || f.window !== 500000) { console.error("FAIL: fable entry wrong", JSON.stringify(f)); process.exit(1); }
         if (!d.every(x => typeof x.window === "number")) { console.error("FAIL: window not numeric"); process.exit(1); }
         console.log("  ok: list --json valid, 13 entries, fable correct, windows numeric");
     ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
@@ -353,7 +353,7 @@ import json,sys
 d=json.load(sys.stdin)
 assert isinstance(d,list) and len(d)==13, ("len", len(d))
 f=[x for x in d if x["alias"]=="fable"][0]
-assert f["id"]=="cc/claude-fable-5" and f["window"]==1000000, f
+assert f["id"]=="cc/claude-fable-5" and f["window"]==500000, f
 assert all(isinstance(x["window"],int) for x in d), "window not int"
 print("  ok: list --json valid, 13 entries, fable correct, windows numeric")
 ' && PASS=$((PASS+1)) || { echo "  FAIL: list --json"; FAIL=$((FAIL+1)); }
