@@ -12,19 +12,19 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.
 get_model() {
     case "$1" in
-        fable|cc/claude-fable-5)                echo "cc/claude-fable-5|1000000" ;;
-        opus|cc/claude-opus-4-8)                echo "cc/claude-opus-4-8|1000000" ;;
+        fable|cc/claude-fable-5)                echo "cc/claude-fable-5|500000" ;;
+        opus|cc/claude-opus-4-8)                echo "cc/claude-opus-4-8|500000" ;;
         sonnet|cc/claude-sonnet-5)              echo "cc/claude-sonnet-5|200000" ;;
         haiku|cc/claude-haiku-4-5-20251001)     echo "cc/claude-haiku-4-5-20251001|200000" ;;
         gpt5|cx/gpt-5.5)                        echo "cx/gpt-5.5|128000" ;;
-        glm5|glm/glm-5.2)                       echo "glm/glm-5.2|1000000" ;;
-        glmturbo|glm/glm-5-turbo)               echo "glm/glm-5-turbo|1000000" ;;
-        deepseek|ds/deepseek-v4-pro)            echo "ds/deepseek-v4-pro|1000000" ;;
-        dsflash|ds/deepseek-v4-flash)           echo "ds/deepseek-v4-flash|1000000" ;;
-        kimi|kimi/kimi-k2.7)                    echo "kimi/kimi-k2.7|1000000" ;;
+        glm5|glm/glm-5.2)                       echo "glm/glm-5.2|500000" ;;
+        glmturbo|glm/glm-5-turbo)               echo "glm/glm-5-turbo|500000" ;;
+        deepseek|ds/deepseek-v4-pro)            echo "ds/deepseek-v4-pro|500000" ;;
+        dsflash|ds/deepseek-v4-flash)           echo "ds/deepseek-v4-flash|500000" ;;
+        kimi|kimi/kimi-k2.7)                    echo "kimi/kimi-k2.7|500000" ;;
         grok|xai/grok-4.5)                      echo "xai/grok-4.5|500000" ;;
         grokcomposer|xai/grok-composer-2.5-fast) echo "xai/grok-composer-2.5-fast|500000" ;;
-        minimax|minimax/MiniMax-M3)             echo "minimax/MiniMax-M3|1000000" ;;
+        minimax|minimax/MiniMax-M3)             echo "minimax/MiniMax-M3|500000" ;;
         *) return 1 ;;
     esac
 }
@@ -176,11 +176,11 @@ list_models() {
         # IDs/aliases contain no quote/backslash chars, so no escaping needed.
         local entries="" a id win rest
         for row in \
-            "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
-            "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
-            "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
-            "kimi|kimi/kimi-k2.7|1000000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
-            "minimax|minimax/MiniMax-M3|1000000"; do
+            "fable|cc/claude-fable-5|500000" "opus|cc/claude-opus-4-8|500000" "sonnet|cc/claude-sonnet-5|200000" \
+            "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|500000" \
+            "glmturbo|glm/glm-5-turbo|500000" "deepseek|ds/deepseek-v4-pro|500000" "dsflash|ds/deepseek-v4-flash|500000" \
+            "kimi|kimi/kimi-k2.7|500000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
+            "minimax|minimax/MiniMax-M3|500000"; do
             a="${row%%|*}"; rest="${row#*|}"; id="${rest%%|*}"; win="${rest##*|}"
             entries="${entries}{\"alias\":\"$a\",\"id\":\"$id\",\"window\":$win},"
         done
@@ -190,11 +190,11 @@ list_models() {
     printf '%-14s %-32s %s\n' "ALIAS" "9ROUTER_ID" "WINDOW"
     local a id win rest
     for row in \
-        "fable|cc/claude-fable-5|1000000" "opus|cc/claude-opus-4-8|1000000" "sonnet|cc/claude-sonnet-5|200000" \
-        "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|1000000" \
-        "glmturbo|glm/glm-5-turbo|1000000" "deepseek|ds/deepseek-v4-pro|1000000" "dsflash|ds/deepseek-v4-flash|1000000" \
-        "kimi|kimi/kimi-k2.7|1000000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
-        "minimax|minimax/MiniMax-M3|1000000"; do
+        "fable|cc/claude-fable-5|500000" "opus|cc/claude-opus-4-8|500000" "sonnet|cc/claude-sonnet-5|200000" \
+        "haiku|cc/claude-haiku-4-5-20251001|200000" "gpt5|cx/gpt-5.5|128000" "glm5|glm/glm-5.2|500000" \
+        "glmturbo|glm/glm-5-turbo|500000" "deepseek|ds/deepseek-v4-pro|500000" "dsflash|ds/deepseek-v4-flash|500000" \
+        "kimi|kimi/kimi-k2.7|500000" "grok|xai/grok-4.5|500000" "grokcomposer|xai/grok-composer-2.5-fast|500000" \
+        "minimax|minimax/MiniMax-M3|500000"; do
         a="${row%%|*}"; rest="${row#*|}"; id="${rest%%|*}"; win="${rest##*|}"
         printf '%-14s %-32s %s\n' "$a" "$id" "$win"
     done
