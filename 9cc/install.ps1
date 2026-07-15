@@ -1,5 +1,3 @@
-# 9cc installer — prefer: gh api contents | base64 decode | iex
-# Downloads 9cc.ps1 into ~\.9cc and copies it into a writable PATH dir.
 $ErrorActionPreference = 'Stop'
 $Home9 = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $env:USERPROFILE '.9cc' }
 $Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
@@ -31,7 +29,6 @@ if (-not $env:CC9_BIN_DIR) { throw "install: no writable bin dir (set CC9_BIN_DI
 
 New-Item -ItemType Directory -Force $Home9 | Out-Null
 $target = Join-Path $Home9 '9cc.ps1'
-# Write to a temp file then Move-Item so a running update process is not truncated in place.
 function Install-AtomicFile([string]$Dest, [scriptblock]$Writer) {
     $dir = Split-Path -Parent $Dest
     $tmp = Join-Path $dir ('.9cc-install.' + [guid]::NewGuid().ToString('N'))
@@ -60,7 +57,6 @@ if ($env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)) {
 
 Copy-Item $target (Join-Path $env:CC9_BIN_DIR '9cc.ps1') -Force
 
-# Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
 $localSrc = $env:CC9_SOURCE -and (Test-Path $env:CC9_SOURCE)
 $srcDir = if ($localSrc) { Split-Path $env:CC9_SOURCE } else { $PSScriptRoot }
 function Install-Asset($Name) {

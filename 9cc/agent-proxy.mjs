@@ -1,19 +1,3 @@
-/**
- * agent-proxy — see what Claude Code actually sends the model.
- *
- * A zero-dependency logging proxy for Claude Code. It sits between the CLI and
- * the Anthropic API, forwards every request untouched (auth header and all),
- * streams the response straight back so the CLI is unaffected, and for each
- * request writes a readable Markdown document — led by a ranked table of what
- * is eating your context.
- *
- * Run:   node proxy.mjs
- * Point Claude Code at it:
- *   ANTHROPIC_BASE_URL=http://localhost:8787 claude
- *
- * Zero runtime dependencies — Node built-ins only. Requires Node 18+.
- */
-
 import http from "node:http";
 import https from "node:https";
 import fs from "node:fs";
@@ -29,24 +13,17 @@ const UPSTREAM_PORT = UPSTREAM_URL.port || (UPSTREAM_URL.protocol === "http:" ? 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LOG_DIR = process.env.LOG_DIR ?? path.join(HERE, "logs");
 
-/** Rough token estimate for display. Real input tokens come from the response
- * usage; this is only for ranking the request before the reply arrives. */
 const estTokens = (bytes) => Math.round(bytes / 4);
 
-/** count_tokens calls send content but get back only a number, never a reply.
- * A single turn fires many as housekeeping — pure noise here, so skip them. */
 const isTokenCount = (reqPath) => reqPath.includes("count_tokens");
 
 const REDACT = new Set(["authorization", "x-api-key", "api-key"]);
 
-/** Strip hop-by-hop and encoding headers so the captured response is readable,
- * recompute content-length, and pass auth through untouched so the real request
- * still authenticates. */
 function forwardHeaders(headers, body) {
   const out = { ...headers };
   delete out["host"];
   delete out["connection"];
-  delete out["accept-encoding"]; // force identity so we can read the stream
+  delete out["accept-encoding"]; // identity encoding so the streamed body is readable
   delete out["transfer-encoding"];
   delete out["content-length"];
   if (body.length > 0) out["content-length"] = String(body.length);
@@ -58,12 +35,6 @@ function baseName() {
   return `${stamp}_anthropic`;
 }
 
-// ---------------------------------------------------------------------------
-// The audit: rank what's in the request
-// ---------------------------------------------------------------------------
-
-/** Measure every removable region of the request and rank the tools by size.
- * This is the whole point of the proxy — the numbers you cut against. */
 function auditRequest(reqJson, realInputTokens) {
   const tools = Array.isArray(reqJson?.tools) ? reqJson.tools : [];
   const toolRows = tools
@@ -87,7 +58,6 @@ function auditRequest(reqJson, realInputTokens) {
   };
 }
 
-/** The ranked table, as Markdown. The hero of the whole document. */
 function renderAudit(a) {
   const pct = (b) => (a.totalBytes ? ((b / a.totalBytes) * 100).toFixed(1) : "0.0");
   const rows = a.toolRows
@@ -115,7 +85,6 @@ function renderAudit(a) {
   ].join("\n");
 }
 
-/** The same ranking, compact, for the terminal — so you see the bloat live. */
 function printAudit(a, base) {
   const top = a.toolRows.slice(0, 12);
   const w = Math.max(4, ...top.map((r) => r.name.length));
@@ -127,10 +96,6 @@ function printAudit(a, base) {
   if (a.toolRows.length > top.length) console.log(`  … ${a.toolRows.length - top.length} more`);
   console.log(`  logs/${base}.md\n`);
 }
-
-// ---------------------------------------------------------------------------
-// Readable Markdown render (Anthropic /messages only)
-// ---------------------------------------------------------------------------
 
 const fenceJson = (v) => "```json\n" + JSON.stringify(v, null, 2) + "\n```";
 const fence = (t, lang = "") => "```" + lang + "\n" + t + "```";
@@ -205,14 +170,12 @@ function renderMessages(messages) {
   return ["<messages>", "", rendered.join("\n\n"), "", "</messages>"].join("\n");
 }
 
-/** Reassemble the streamed SSE response so we can read the reply — and pull the
- * real input-token count out of the usage events. */
 function decodeResponse(raw) {
   const events = [];
   for (const line of raw.split(/\r?\n/)) {
     const m = line.match(/^data:\s?(.*)$/);
     if (!m || m[1] === "[DONE]" || m[1].trim() === "") continue;
-    try { events.push(JSON.parse(m[1])); } catch { /* skip */ }
+    try { events.push(JSON.parse(m[1])); } catch { }
   }
   const blocks = {};
   let stopReason, usage;
@@ -258,10 +221,6 @@ function renderMarkdown(c, audit, responseMd) {
   parts.push("<response>\n\n" + responseMd + "\n\n</response>");
   return parts.join("\n\n") + "\n";
 }
-
-// ---------------------------------------------------------------------------
-// Server
-// ---------------------------------------------------------------------------
 
 function handle(req, res) {
   const reqPath = req.url ?? "/";

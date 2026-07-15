@@ -1,6 +1,3 @@
-# 9cc — launch Claude Code with a dynamic model over the 9Router gateway.
-# Reads auth from ~/.claude/settings.json (read-only). Windows native.
-# Usage: 9cc.ps1 list | run | next | update | uninstall | version | help
 [CmdletBinding()]
 param([switch]$DotSource)
 $ErrorActionPreference = 'Stop'
@@ -23,7 +20,7 @@ $Script:ModelMap = [ordered]@{
     'kimi'         = @{ Id='kimi/kimi-k2.7';                Window='500000' }
     'grok'         = @{ Id='xai/grok-4.5';                  Window='500000' }
     'grokcomposer' = @{ Id='xai/grok-composer-2.5-fast';    Window='500000' }
-    'minimax'      = @{ Id='minimax/MiniMax-M3';            Window='500000' }
+    'minimax'      = @{ Id='minimax/MiniMax-M3';             Window='500000' }
 }
 
 function Get-Model { param([string]$Key)
@@ -38,7 +35,6 @@ function Get-Cascade { param([ValidateSet('opus','free')][string]$Tier)
 }
 
 function Get-NextModel { param([string]$Current,[switch]$NoFree)
-    # Accept alias or full id; cascade chains store full IDs, so resolve first.
     $resolved = Get-Model $Current
     if ($resolved) { $Current = $resolved.Id }
     $chain = @(Get-Cascade 'opus')
@@ -118,11 +114,9 @@ function Uninstall-9cc {
     }
     $cmd = Get-Command '9cc.ps1' -ErrorAction SilentlyContinue
     if ($cmd -and $cmd.Source -and ($cmd.Source -ne $PSCommandPath)) {
-        # only remove the PATH copy if it's not the file we're currently running from
         Remove-Item -Force $cmd.Source -ErrorAction SilentlyContinue
         Write-Host "removed: $($cmd.Source)"
     } elseif ($PSCommandPath -and (Test-Path $PSCommandPath) -and ($PSCommandPath -like '*9cc.ps1')) {
-        # invoked directly from the bin copy; self-remove
         Remove-Item -Force $PSCommandPath -ErrorAction SilentlyContinue
         Write-Host "removed: $PSCommandPath"
     }
@@ -167,9 +161,6 @@ function Read-Setting { param([string]$Name)
 }
 
 function Get-TierDefaults { param([string]$Id)
-    # Claude family: OPUS=fable when selected fable else opus; SONNET=sonnet; HAIKU=haiku.
-    # Grok family: OPUS+SONNET=grok-4.5; HAIKU=composer.
-    # Else: all three = selected id.
     switch -Regex ($Id) {
         '^(cc/claude-fable-5|cc/claude-opus-4-8|cc/claude-sonnet-5|cc/claude-haiku-4-5-20251001)$' {
             if ($Id -eq 'cc/claude-fable-5') {

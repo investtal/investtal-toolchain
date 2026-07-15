@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# 9cc installer — prefer: gh api contents | base64 -d | bash
-# Downloads 9cc.sh into ~/.9cc and symlinks `9cc` into a writable PATH dir.
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
@@ -17,7 +15,6 @@ if [ -z "$CC9_VERSION" ]; then
     [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.4"
 fi
 CC9_SOURCE="${CC9_SOURCE:-}"
-# prefer explicit CC9_BIN_DIR, else first writable candidate
 if [ -z "${CC9_BIN_DIR:-}" ]; then
     for c in /usr/local/bin "$HOME/.local/bin"; do
         if mkdir -p "$c" 2>/dev/null && [ -w "$c" ]; then CC9_BIN_DIR="$c"; break; fi
@@ -27,16 +24,12 @@ if [ -z "${CC9_BIN_DIR:-}" ]; then echo "install: no writable bin dir found (set
 
 mkdir -p "$CC9_HOME" "$CC9_BIN_DIR"
 
-# Write via temp file + rename so an in-flight `9cc update` (which is executing
-# the previous ~/.9cc/9cc.sh inode) is not corrupted by an in-place truncate.
-# In-place `> file` reuses the inode; bash 3.2 re-reads it mid-script → syntax errors.
 atomic_install() {
     local dest="$1"
     local dir tmp
     dir="$(dirname "$dest")"
     mkdir -p "$dir"
     tmp="$(mktemp "${dir}/.9cc-install.XXXXXX")" || return 1
-    # Caller left payload on stdin.
     cat > "$tmp" || { rm -f "$tmp"; return 1; }
     mv -f "$tmp" "$dest"
 }
@@ -72,7 +65,6 @@ fi
 chmod +x "$CC9_HOME/9cc.sh"
 printf '%s\n' "$CC9_VERSION" > "$CC9_HOME/version"
 
-# Install sandbox assets next to the launcher so 9cc sandbox build works from an installed copy.
 install_asset() {
     local name="$1" src tmp
     if [ -n "${CC9_SOURCE:-}" ] && [ -f "$CC9_SOURCE" ]; then
@@ -82,7 +74,6 @@ install_asset() {
         fi
         return 0
     fi
-    # Remote install: fetch from the same tagged tree as 9cc.sh.
     src="https://raw.githubusercontent.com/investtal/investtal-toolchain/$CC9_VERSION/9cc/$name"
     tmp="$(mktemp "${CC9_HOME}/.9cc-install.XXXXXX")"
     if curl -fsSL "$src" -o "$tmp" 2>/dev/null; then

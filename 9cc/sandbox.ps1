@@ -1,4 +1,3 @@
-# 9cc sandbox helpers — PowerShell mirror of sandbox.sh
 $ErrorActionPreference = 'Stop'
 
 $CC9Home = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $env:USERPROFILE '.9cc' }
@@ -43,7 +42,7 @@ function Test-IsContainerRunnableClaude {
     try {
         $buf = New-Object byte[] 2
         if ($fs.Read($buf, 0, 2) -lt 2) { return $false }
-        return ($buf[0] -eq 0x23 -and $buf[1] -eq 0x21)  # #!
+        return ($buf[0] -eq 0x23 -and $buf[1] -eq 0x21)
     } finally { $fs.Dispose() }
 }
 
@@ -52,7 +51,6 @@ function Resolve-FullPath {
     try { return (Resolve-Path -LiteralPath $Path).Path } catch { return $Path }
 }
 
-# Returns hashtable: @{ Kind = 'dir'|'bin'|'npm'; Path = string }
 function Find-ClaudeSource {
     if ($env:CC9_CLAUDE_LOCAL) {
         if (-not (Test-Path -LiteralPath $env:CC9_CLAUDE_LOCAL -PathType Container)) {
@@ -153,7 +151,6 @@ function Stage-ClaudeLocal {
 function Build-SandboxImage {
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw '9cc sandbox: docker not found' }
 
-    # Guard: only wipe our own managed context dir to avoid data loss if user overrides CC9_SANDBOX_CONTEXT.
     $homeNorm = (Resolve-Path $CC9Home).Path
     $isManaged = ($SandboxContext -like "$homeNorm*") -or ($SandboxContext -like "$([System.IO.Path]::GetTempPath())*")
     if (-not $isManaged) { throw "9cc sandbox: refusing to wipe CC9_SANDBOX_CONTEXT=$SandboxContext (must be under `$CC9_HOME or temp)" }
@@ -162,7 +159,6 @@ function Build-SandboxImage {
 
     Stage-ClaudeLocal -ContextDir $SandboxContext
     Copy-IfExists (Join-Path $env:USERPROFILE '.claude') (Join-Path $SandboxContext 'claude')
-    # Never bake secrets or the host binary into image layers; both are supplied at runtime.
     Remove-Item -Recurse -Force (Join-Path $SandboxContext 'claude\settings.json') -ErrorAction SilentlyContinue
     Remove-Item -Recurse -Force (Join-Path $SandboxContext 'claude\local') -ErrorAction SilentlyContinue
     Copy-IfExists (Join-Path $env:USERPROFILE '.investtal') (Join-Path $SandboxContext 'investtal')
@@ -207,8 +203,6 @@ function Invoke-SandboxRun {
     Write-Host "9cc sandbox: egress logs -> $egress" -ForegroundColor Cyan
 
     $dockerArgs = @('run', '--rm', '-it')
-    # Native Windows has no meaningful Linux uid/gid mapping; use container defaults.
-    # On PowerShell Core on Linux/macOS/WSL, map the host uid/gid so bind mounts align.
     if (Get-Command id -ErrorAction SilentlyContinue) {
         $uid = (& id -u).Trim()
         $gid = (& id -g).Trim()

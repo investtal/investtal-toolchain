@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# 9cc — launch Claude Code with a dynamic model over the 9Router gateway.
-# Reads auth from ~/.claude/settings.json (read-only). Mac/Linux/WSL.
-# Usage: 9cc list | run | next | update | uninstall | version | help
 set -euo pipefail
 
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
@@ -9,7 +6,6 @@ CC9_VERSION="${CC9_VERSION:-$(cat "$CC9_HOME/version" 2>/dev/null || echo 0.1.0-
 CLAUDE_SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# get_model <alias-or-id> -> echo "<9RouterID>|<window>"; exit 1 if unknown.
 get_model() {
     case "$1" in
         fable|cc/claude-fable-5)                echo "cc/claude-fable-5|500000" ;;
@@ -29,8 +25,6 @@ get_model() {
     esac
 }
 
-# Tiered cascade chains (spec §8 OPUS_FALLBACK + §9 FREE_CASCADE). 9cc is the single
-# source of model truth; the fleet healer asks `9cc next` to advance through these.
 cascade_for() {
     case "$1" in
         opus) echo "cc/claude-opus-4-8 cx/gpt-5.5-high glm/glm-5.2-max" ;;
@@ -93,7 +87,6 @@ do_update() {
         if command -v gh >/dev/null 2>&1; then
             local b64
             b64="$(gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=$latest" --jq '.content' 2>/dev/null)" || b64=""
-            # GitHub returns base64 with line breaks; strip all whitespace before decoding.
             if [ -n "$b64" ]; then
                 script="$(printf '%s' "$b64" | tr -d '[:space:]' | base64 -d 2>/dev/null)" || script=""
             fi
@@ -106,9 +99,7 @@ do_update() {
     fi
     echo "9cc updated to $latest" >&2
     echo "9cc $latest"
-    # Installer replaces ~/.9cc/9cc.sh. Even with atomic rename, exit so we never
-    # continue parsing this process's script stream after a self-update
-    # (bash 3.2 on macOS: in-place truncate → "syntax error near ;;").
+    # bash 3.2 (macOS) re-parses the replaced script after self-update → syntax error.
     exit 0
 }
 do_uninstall() {
@@ -132,12 +123,9 @@ do_uninstall() {
     echo "9cc uninstalled"
 }
 
-# Walks opus chain first, then the free cascade (unless --no-free). Unknown current -> exit 1.
 # ponytail: cascade hardcoded flat; extract to models.json when >2 tiers
 next_model() {
     local current="$1"; shift
-    # Accept both aliases (opus) and full IDs (cc/claude-opus-4-8); cascade chains
-    # store full IDs, so resolve before walking.
     local props; if props="$(get_model "$current")"; then current="${props%%|*}"; fi
     local allow_free=1
     [ "${1:-}" = "--no-free" ] && allow_free=0
@@ -172,8 +160,6 @@ EOF
 
 list_models() {
     if [ "${1:-}" = "--json" ]; then
-        # Machine-readable registry (fleet consumes this). Hand-built JSON: registry
-        # IDs/aliases contain no quote/backslash chars, so no escaping needed.
         local entries="" a id win rest
         for row in \
             "fable|cc/claude-fable-5|500000" "opus|cc/claude-opus-4-8|500000" "sonnet|cc/claude-sonnet-5|200000" \
@@ -212,22 +198,15 @@ read_setting() {
             process.stdout.write(v);
         ' "$key" 2>/dev/null)" || v=""
     fi
-    # Fallback when node is unavailable: pull "key":"value" from the env block
-    # with a JSON-aware-ish unescape. settings.json is a flat env object.
     if [ -z "$v" ]; then
         v="$(grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$CLAUDE_SETTINGS" \
             | sed -E 's/.*:[[:space:]]*"(.*)"$/\1/' | head -n1)"
-        # unescape common JSON string escapes
         v="${v//\\\"/\"}"; v="${v//\\\\/\\}"; v="${v//\\n/$'\n'}"; v="${v//\\t/$'\t'}"
     fi
     [ -n "$v" ] || { echo "9cc: '$key' not found in $CLAUDE_SETTINGS env" >&2; return 1; }
     printf '%s' "$v"
 }
 
-# Family-aware DEFAULT_{OPUS,SONNET,HAIKU} tiers for Claude Code internal routing.
-# Claude: OPUS=fable when selected fable else opus; SONNET=sonnet; HAIKU=haiku.
-# Grok: OPUS+SONNET=grok-4.5; HAIKU=composer.
-# Else: all three = selected id.
 tier_defaults() {
     local id="$1"
     case "$id" in

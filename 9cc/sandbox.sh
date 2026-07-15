@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# 9cc sandbox helpers — isolate Claude Code in Docker.
 set -euo pipefail
 
 : "${CC9_HOME:=${HOME}/.9cc}"
@@ -26,7 +25,23 @@ _copy_dir_if_exists() {
     if [ -d "$src" ]; then cp -a "$src" "$dst"; fi
 }
 
-# Resolve symlinks portably (macOS lacks readlink -f).
+is_managed_context() {
+    case "$1/" in
+        "${CC9_HOME}/"*) return 0 ;;
+        /tmp/*|/var/tmp/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+scrub_runtime_only_files() {
+    rm -rf "$1/claude/settings.json" "$1/claude/local"
+}
+
+replace_dir() {
+    rm -rf "$2"
+    cp -a "$1" "$2"
+}
+
 _resolve_path() {
     local p="$1"
     if command -v realpath >/dev/null 2>&1; then
@@ -35,7 +50,6 @@ _resolve_path() {
     if command -v python3 >/dev/null 2>&1; then
         python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null && return 0
     fi
-    # Best-effort manual follow for simple absolute/relative symlinks.
     local target
     while [ -L "$p" ]; do
         target="$(readlink "$p")" || break
@@ -47,7 +61,6 @@ _resolve_path() {
     printf '%s' "$p"
 }
 
-# True if file is a Linux ELF binary (runs inside node:*-slim containers).
 _is_linux_elf() {
     local f="$1"
     [ -f "$f" ] || return 1
@@ -56,8 +69,6 @@ _is_linux_elf() {
     [ "$magic" = "7f454c46" ]
 }
 
-# True if file can be copied into the Linux image as the claude CLI:
-# Linux ELF, or a shebang script (typical npm / migrate-installer wrapper).
 _is_container_runnable_claude() {
     local f="$1"
     [ -f "$f" ] || return 1
@@ -67,13 +78,6 @@ _is_container_runnable_claude() {
     [ "$head2" = "#!" ]
 }
 
-# Locate host Claude install. Team members use different layouts:
-#   1) CC9_CLAUDE_LOCAL  — explicit directory (copied as image /.claude/local)
-#   2) CC9_CLAUDE_BIN    — explicit binary path
-#   3) ~/.claude/local   — classic migrate-installer / local install
-#   4) `claude` on PATH  — native installer (~/.local/bin/claude → versions/N)
-# Prints:  dir|<path>  |  bin|<path>  |  npm|
-# npm  = no host-copyable Linux-runnable install; Dockerfile installs via npm.
 find_claude_source() {
     local dir bin resolved candidate
 
@@ -97,7 +101,6 @@ find_claude_source() {
         return 0
     fi
 
-    # Classic local install directory.
     if [ -d "$HOME/.claude/local" ]; then
         candidate=""
         if [ -f "$HOME/.claude/local/bin/claude" ]; then
@@ -114,7 +117,6 @@ find_claude_source() {
         fi
     fi
 
-    # PATH resolution (native installer: ~/.local/bin/claude → share/claude/versions/*).
     if command -v claude >/dev/null 2>&1; then
         bin="$(command -v claude)"
         resolved="$(_resolve_path "$bin")"
@@ -127,7 +129,6 @@ find_claude_source() {
         return 0
     fi
 
-    # Common native-installer locations when PATH is incomplete (e.g. non-login shell).
     for candidate in \
         "$HOME/.local/bin/claude" \
         "$HOME/.local/share/claude/versions"/*
@@ -145,8 +146,6 @@ find_claude_source() {
     printf 'npm|\n'
 }
 
-# Stage claude-local/ + claude-source.mode into the Docker build context.
-# Image always expects /home/9cc/.claude/local/bin on PATH (see sandbox-entrypoint.sh).
 stage_claude_local() {
     local ctx="$1"
     local src kind path
@@ -156,10 +155,7 @@ stage_claude_local() {
 
     case "$kind" in
         dir)
-            # Replace dest contents (cp into an existing dir would nest basename).
-            rm -rf "$ctx/claude-local"
-            cp -a "$path" "$ctx/claude-local"
-            # Normalize so entrypoint PATH works even if host used flat layout.
+            replace_dir "$path" "$ctx/claude-local"
             if [ ! -e "$ctx/claude-local/bin/claude" ] && [ -f "$ctx/claude-local/claude" ]; then
                 mkdir -p "$ctx/claude-local/bin"
                 cp -a "$ctx/claude-local/claude" "$ctx/claude-local/bin/claude"
@@ -175,7 +171,6 @@ stage_claude_local() {
             echo "9cc sandbox: using host Claude binary $path" >&2
             ;;
         npm)
-            # Placeholder so COPY claude-local always has content; Dockerfile npm-installs.
             mkdir -p "$ctx/claude-local"
             printf '# npm install inside image\n' > "$ctx/claude-local/.npm-install"
             printf 'npm\n' > "$ctx/claude-source.mode"
@@ -191,20 +186,14 @@ build_image() {
     command -v docker >/dev/null 2>&1 || { echo "9cc sandbox: docker not found" >&2; return 1; }
 
     local ctx="$CC9_SANDBOX_CONTEXT"
-    # Guard: only wipe our own managed context dir to avoid data loss if user overrides CC9_SANDBOX_CONTEXT.
-    case "$ctx/" in
-        "${CC9_HOME}/"*) : ;;           # default location
-        /tmp/*|/var/tmp/*) : ;;         # explicit scratch
-        *) echo "9cc sandbox: refusing to wipe CC9_SANDBOX_CONTEXT=$ctx (must be under \$CC9_HOME or /tmp)" >&2; return 1 ;;
-    esac
+    is_managed_context "$ctx" || { echo "9cc sandbox: refusing to wipe CC9_SANDBOX_CONTEXT=$ctx (must be under \$CC9_HOME or /tmp)" >&2; return 1; }
     rm -rf "$ctx"
     mkdir -p "$ctx"
 
     mkdir -p "$ctx/claude"
     stage_claude_local "$ctx" || return 1
     _copy_dir_if_exists "$HOME/.claude" "$ctx/claude"
-    # Never bake secrets or the host binary into image layers; both are supplied at runtime.
-    rm -rf "$ctx/claude/settings.json" "$ctx/claude/local"
+    scrub_runtime_only_files "$ctx"
     mkdir -p "$ctx/investtal" "$ctx/proto"
     _copy_dir_if_exists "$HOME/.investtal" "$ctx/investtal"
     _copy_dir_if_exists "$HOME/.proto" "$ctx/proto"

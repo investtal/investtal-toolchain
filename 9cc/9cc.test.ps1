@@ -1,4 +1,3 @@
-# 9cc.ps1 TDD harness. Assert-based. Run: pwsh -File 9cc/9cc.test.ps1
 $ErrorActionPreference = 'Stop'
 $DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $script:Pass = 0; $script:Fail = 0
@@ -78,8 +77,6 @@ Write-Output "OPUS=$env:ANTHROPIC_DEFAULT_OPUS_MODEL"
 Write-Output "SONNET=$env:ANTHROPIC_DEFAULT_SONNET_MODEL"
 Write-Output "HAIKU=$env:ANTHROPIC_DEFAULT_HAIKU_MODEL"
 '@
-# Windows stub as .cmd that echoes env via powershell is heavy; use function override by PATH
-# Prefer a .ps1 shim named claude.cmd calling powershell -Command Write-Output
 $cmd = @"
 @echo off
 echo MODEL=%ANTHROPIC_MODEL%
@@ -205,7 +202,6 @@ if ($src -match 'contents/9cc/9cc\.ps1' -and $src -match 'Get-Command gh' -and $
 Write-Host "Cycle 12: Get-LatestTag prefers gh"
 $fn = (Get-Content -Raw "$DIR\9cc.ps1")
 if ($fn -match 'function Get-LatestTag' -and $fn -match "Get-Command gh") {
-    # ensure gh appears inside Get-LatestTag region roughly: between function and next function
     $m = [regex]::Match($fn, 'function Get-LatestTag[\s\S]*?function Update-9cc')
     if ($m.Success -and $m.Value -match 'Get-Command gh') {
         Write-Host "  ok: Get-LatestTag uses gh"; $script:Pass++
