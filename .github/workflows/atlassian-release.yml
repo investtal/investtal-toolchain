@@ -1,0 +1,103 @@
+name: atlassian-release
+
+on:
+  push:
+    tags:
+      - "atlassian-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux-gnu
+            asset_os: linux
+            asset_arch: amd64
+            ext: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-linux-gnu
+            asset_os: linux
+            asset_arch: arm64
+            ext: tar.gz
+          - os: macos-latest
+            target: x86_64-macos
+            asset_os: macos
+            asset_arch: amd64
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-macos
+            asset_os: macos
+            asset_arch: arm64
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-windows
+            asset_os: windows
+            asset_arch: amd64
+            ext: zip
+          - os: windows-latest
+            target: aarch64-windows
+            asset_os: windows
+            asset_arch: arm64
+            ext: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Build
+        working-directory: atlassian
+        run: zig build -Doptimize=ReleaseSafe -Dtarget=${{ matrix.target }}
+      - name: Package (unix)
+        if: matrix.ext == 'tar.gz'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#atlassian-v}"
+          BIN=atlassian/zig-out/bin/atlassian
+          NAME="atlassian_${VERSION}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}"
+          mkdir -p dist
+          cp "$BIN" "dist/atlassian"
+          tar -C dist -czf "${NAME}.tar.gz" atlassian
+          echo "ASSET=${NAME}.tar.gz" >> "$GITHUB_ENV"
+      - name: Package (windows)
+        if: matrix.ext == 'zip'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#atlassian-v}"
+          BIN=atlassian/zig-out/bin/atlassian.exe
+          NAME="atlassian_${VERSION}_${{ matrix.asset_os }}_${{ matrix.asset_arch }}"
+          mkdir -p dist
+          cp "$BIN" "dist/atlassian.exe"
+          (cd dist && zip "../${NAME}.zip" atlassian.exe)
+          echo "ASSET=${NAME}.zip" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten + checksums
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#atlassian-v}"
+          mkdir -p release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          cd release
+          sha256sum * > "atlassian_${VERSION}_checksums.txt"
+          ls -la
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

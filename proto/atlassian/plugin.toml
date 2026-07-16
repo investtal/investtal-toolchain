@@ -1,0 +1,35 @@
+# @investtal/proto-plugins — atlassian (Investtal Atlassian CLI)
+#
+# Cross-platform Zig CLI for Jira / Confluence / Goals / Teams.
+# Binaries published via GitHub Releases on tag atlassian-v*.
+#
+# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+
+name = "Atlassian CLI"
+type = "cli"
+
+[resolve]
+git-url = "https://github.com/investtal/investtal-toolchain"
+
+[platform.linux]
+exe-path = "atlassian"
+download-file = "atlassian_{version}_linux_{arch}.tar.gz"
+checksum-file = "atlassian_{version}_checksums.txt"
+
+[platform.macos]
+exe-path = "atlassian"
+download-file = "atlassian_{version}_macos_{arch}.tar.gz"
+checksum-file = "atlassian_{version}_checksums.txt"
+
+[platform.windows]
+exe-path = "atlassian.exe"
+download-file = "atlassian_{version}_windows_{arch}.zip"
+checksum-file = "atlassian_{version}_checksums.txt"
+
+[install]
+download-url = "https://github.com/investtal/investtal-toolchain/releases/download/atlassian-v{version}/{download_file}"
+checksum-url = "https://github.com/investtal/investtal-toolchain/releases/download/atlassian-v{version}/{checksum_file}"
+
+[install.arch]
+aarch64 = "arm64"
+x86_64 = "amd64"

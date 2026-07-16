@@ -1,12 +1,27 @@
-//! Library root — re-exports modules so `zig build test` picks up their tests.
+//! Atlassian CLI library root — re-exports modules for tests and embedding.
 const std = @import("std");
 
-pub const cli = @import("cli/root.zig");
 pub const exit_codes = @import("cli/exit_codes.zig");
 pub const flags = @import("cli/flags.zig");
 pub const render = @import("cli/render.zig");
+pub const cli = @import("cli/root.zig");
+pub const config = @import("config/root.zig");
+pub const auth = @import("auth/root.zig");
+pub const auth_store = @import("auth/store.zig");
+pub const auth_oauth = @import("auth/oauth.zig");
+pub const http_error = @import("http/error.zig");
+pub const transport = @import("http/transport.zig");
+pub const http_client = @import("http/client.zig");
+pub const graphql = @import("graphql/client.zig");
+pub const jira_issue = @import("jira/issue.zig");
+pub const jira_project = @import("jira/project.zig");
+pub const jira_board = @import("jira/board.zig");
+pub const jira_sprint = @import("jira/sprint.zig");
+pub const conf_page = @import("confluence/page.zig");
+pub const platform_goal = @import("platform/goal.zig");
+pub const platform_team = @import("platform/team.zig");
+pub const api_raw = @import("api/raw.zig");
 
 test {
-    // Force-import cli modules so their test blocks are linked.
     std.testing.refAllDecls(@This());
 }
