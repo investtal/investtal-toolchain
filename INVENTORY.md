@@ -22,3 +22,5 @@ findings, and consumer instructions: [`docs/proto-plugins.md`](docs/proto-plugin
 All verified end-to-end with `proto 0.56.4`: each TOML plugin resolves versions,
 downloads, and (where supported) verifies the binary checksum; the openjdk WASM
 plugin loads and lists Adoptium versions.
+
+| atlassian | `proto/atlassian/plugin.toml` | TOML | ✅ release checksums | 2026-07-17 |
