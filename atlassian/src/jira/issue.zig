@@ -37,7 +37,9 @@ pub fn search(client: *http_client.Client, allocator: Allocator, site: transport
     // Jira Cloud v3 enhanced search endpoint
     const url = try site.resolve(allocator, .jira, "search/jql");
     defer allocator.free(url);
-    const body = try std.fmt.allocPrint(allocator, "{{\"jql\":{s},\"maxResults\":{d}}}", .{ try quote(allocator, jql), max_results });
+    const jql_q = try quote(allocator, jql);
+    defer allocator.free(jql_q);
+    const body = try std.fmt.allocPrint(allocator, "{{\"jql\":{s},\"maxResults\":{d}}}", .{ jql_q, max_results });
     defer allocator.free(body);
     return client.request(.{ .method = .POST, .url = url, .auth_header = auth, .body = body });
 }

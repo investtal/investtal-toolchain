@@ -70,7 +70,8 @@ pub const Client = struct {
             last_body = hop.body;
             last_body_owned = true;
 
-            const retriable = hop.status == 429 or hop.status == 502 or hop.status == 503 or hop.status == 504;
+            const is_network = hop.status == 0;
+            const retriable = is_network or hop.status == 429 or hop.status == 502 or hop.status == 503 or hop.status == 504;
             if (!retriable) {
                 if (hop.status >= 200 and hop.status < 300) {
                     last_body_owned = false;
@@ -106,6 +107,10 @@ pub const Client = struct {
             last_body = &.{};
         }
 
+        if (last_status == 0) {
+            const err = try ApiError.network(self.allocator, if (last_body.len > 0) last_body else "network error");
+            return .{ .err = err };
+        }
         const err = try ApiError.fromHttp(self.allocator, last_status, last_body, null);
         return .{ .err = err };
     }
@@ -151,10 +156,10 @@ pub const Client = struct {
             .extra_headers = &.{
                 .{ .name = "Accept", .value = "application/json" },
             },
-        }) catch {
+        }) catch |err| {
             return .{
                 .status = 0,
-                .body = try self.allocator.dupe(u8, "network error"),
+                .body = try std.fmt.allocPrint(self.allocator, "network error: {s}", .{@errorName(err)}),
             };
         };
 
@@ -189,4 +194,27 @@ test "retry three times on 503" {
         .err => return error.TestUnexpectedResult,
     }
     try std.testing.expectEqual(@as(usize, 3), client.fake_index);
+}
+
+test "retry network status 0 then success" {
+    const a = std.testing.allocator;
+    const hops = [_]FakeHop{
+        .{ .status = 0, .body = "network error: Timeout" },
+        .{ .status = 200, .body = "ok" },
+    };
+    var client: Client = .{
+        .allocator = a,
+        .io = undefined,
+        .retries = 3,
+        .fake_hops = &hops,
+    };
+    var result = try client.request(.{
+        .url = "https://example.test/x",
+        .auth_header = "Basic x",
+    });
+    defer result.deinit(a);
+    switch (result) {
+        .ok => |r| try std.testing.expectEqualStrings("ok", r.body),
+        .err => return error.TestUnexpectedResult,
+    }
 }

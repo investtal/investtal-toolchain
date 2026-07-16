@@ -1,6 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const exit_codes = @import("../cli/exit_codes.zig");
 
 pub const Kind = enum {
     http,
@@ -22,21 +21,31 @@ pub const ApiError = struct {
     /// Whether message/code/details were allocated by us.
     owns_message: bool = false,
 
+    /// Map to CLI exit codes (kept here as pure numbers so http does not import cli).
     pub fn exitCode(self: ApiError) u8 {
         return switch (self.kind) {
-            .not_implemented => exit_codes.not_implemented,
-            .auth => exit_codes.auth,
-            .config => exit_codes.usage,
-            .network => exit_codes.network,
+            .not_implemented => 6,
+            .auth => 3,
+            .config => 2,
+            .network => 7,
             .http => blk: {
                 if (self.status) |s| {
-                    if (s == 401 or s == 403) break :blk exit_codes.auth;
-                    if (s == 404) break :blk exit_codes.not_found;
-                    if (s == 429) break :blk exit_codes.rate_limit;
+                    if (s == 401 or s == 403) break :blk 3;
+                    if (s == 404) break :blk 4;
+                    if (s == 429) break :blk 5;
                 }
-                break :blk exit_codes.generic;
+                break :blk 1;
             },
-            .decode => exit_codes.generic,
+            .decode => 1,
+        };
+    }
+
+    pub fn network(allocator: Allocator, message: []const u8) !ApiError {
+        return .{
+            .kind = .network,
+            .message = try allocator.dupe(u8, message),
+            .retriable = true,
+            .owns_message = true,
         };
     }
 

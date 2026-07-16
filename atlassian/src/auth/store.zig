@@ -74,7 +74,12 @@ pub fn saveTokens(allocator: Allocator, io: Io, tokens: TokenSet) !void {
     , .{ tokens.access_token, refresh_s, tokens.expires_at_unix, scope_s, cloud_s });
     defer allocator.free(json);
 
-    try Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = json });
+    // Spec: credentials file mode 0600 (owner read/write only).
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = path,
+        .data = json,
+        .flags = .{ .permissions = @enumFromInt(0o600) },
+    });
 }
 
 pub fn loadTokens(allocator: Allocator, io: Io) !?TokenSet {
