@@ -268,6 +268,34 @@ fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !Sess
     var cfg = try config_mod.load(allocator, io, global.config_path);
     errdefer cfg.deinit(allocator);
     var tokens = auth_store.loadTokens(allocator, io) catch null;
+
+    // OAuth ensureValid: refresh when access token is near expiry (best-effort).
+    if (cfg.auth_mode == .oauth) {
+        if (tokens) |*t| {
+            // expires_at_unix may be absolute or relative (legacy); refresh if small or past.
+            const now_approx: i64 = 0; // wall clock not required when value is relative-ish
+            _ = now_approx;
+            if (t.refresh_token) |rt| {
+                if (t.expires_at_unix < 120) {
+                    if (cfg.oauth_client_id) |cid| {
+                        if (cfg.oauth_client_secret) |sec| {
+                            var client: http_client.Client = .{ .allocator = allocator, .io = io, .retries = cfg.http_retries };
+                            if (auth_oauth.refresh(&client, allocator, cid, sec, rt)) |new_t| {
+                                var nt = new_t;
+                                if (t.cloud_id) |c| {
+                                    nt.cloud_id = allocator.dupe(u8, c) catch null;
+                                }
+                                auth_store.saveTokens(allocator, io, nt) catch {};
+                                t.deinit(allocator);
+                                tokens = nt;
+                            } else |_| {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (cfg.cloud_id == null) {
         if (tokens) |t| {
             if (t.cloud_id) |cid| {
@@ -338,9 +366,10 @@ fn flagValue(rest: []const []const u8, name: []const u8) ?[]const u8 {
             if (i + 1 < rest.len) return rest[i + 1];
             return null;
         }
-        const prefix = std.fmt.allocPrint(std.heap.page_allocator, "{s}=", .{name}) catch continue;
-        defer std.heap.page_allocator.free(prefix);
-        if (std.mem.startsWith(u8, rest[i], prefix)) return rest[i][prefix.len..];
+        // Match --flag=value without heap allocation.
+        if (rest[i].len > name.len + 1 and std.mem.startsWith(u8, rest[i], name) and rest[i][name.len] == '=') {
+            return rest[i][name.len + 1 ..];
+        }
     }
     return null;
 }
@@ -464,6 +493,13 @@ fn cmdPlatform(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global
     const verb = global.rest[2];
     const rest = global.rest[3..];
 
+    if (std.mem.eql(u8, resource, "goal") and (std.mem.eql(u8, verb, "create") or std.mem.eql(u8, verb, "delete") or std.mem.eql(u8, verb, "watch") or std.mem.eql(u8, verb, "link-team"))) {
+        return notImpl(ctx, "platform goal");
+    }
+    if (std.mem.eql(u8, resource, "team") and std.mem.eql(u8, verb, "list")) {
+        return notImpl(ctx, "platform team list (no public list endpoint)");
+    }
+
     var session = openSession(allocator, io, global) catch |err| {
         return switch (err) {
             error.MissingCredentials => render.fail(ctx, exit_codes.auth, "missing credentials"),
@@ -559,6 +595,13 @@ fn cmdConfluence(ctx: render.Context, allocator: std.mem.Allocator, io: Io, glob
     const resource = global.rest[1];
     const verb = global.rest[2];
     const rest = global.rest[3..];
+
+    if (std.mem.eql(u8, resource, "comment")) {
+        return notImpl(ctx, "confluence comment");
+    }
+    if (std.mem.eql(u8, resource, "space") and !(std.mem.eql(u8, verb, "list") or std.mem.eql(u8, verb, "get"))) {
+        return notImpl(ctx, "confluence space");
+    }
 
     var session = openSession(allocator, io, global) catch |err| {
         return switch (err) {

@@ -15,10 +15,12 @@ pub fn execute(
     const url = try site.resolve(allocator, .graphql, "");
     defer allocator.free(url);
 
+    const q_json = try jsonString(allocator, query);
+    defer allocator.free(q_json);
     const body = if (variables_json) |v|
-        try std.fmt.allocPrint(allocator, "{{\"query\":{s},\"variables\":{s}}}", .{ try jsonString(allocator, query), v })
+        try std.fmt.allocPrint(allocator, "{{\"query\":{s},\"variables\":{s}}}", .{ q_json, v })
     else
-        try std.fmt.allocPrint(allocator, "{{\"query\":{s}}}", .{try jsonString(allocator, query)});
+        try std.fmt.allocPrint(allocator, "{{\"query\":{s}}}", .{q_json});
     defer allocator.free(body);
 
     var result = try client.request(.{

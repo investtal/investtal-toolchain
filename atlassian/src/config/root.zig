@@ -224,7 +224,16 @@ pub fn save(allocator: Allocator, io: Io, cfg: Config, path: []const u8) !void {
     try w.print("retries = {d}\n", .{cfg.http_retries});
     try w.flush();
 
-    try Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = aw.written() });
+    // Restrict config when it may hold secrets (token / oauth secret).
+    const mode: Io.File.Permissions = if (cfg.api_token != null or cfg.oauth_client_secret != null)
+        @enumFromInt(0o600)
+    else
+        .default_file;
+    try Io.Dir.cwd().writeFile(io, .{
+        .sub_path = path,
+        .data = aw.written(),
+        .flags = .{ .permissions = mode },
+    });
 }
 
 pub fn setKey(cfg: *Config, allocator: Allocator, key: []const u8, value: []const u8) !void {
