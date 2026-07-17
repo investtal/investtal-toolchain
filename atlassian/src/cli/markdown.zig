@@ -163,9 +163,11 @@ fn tryCollectIssueView(allocator: Allocator, value: Value) EncodeError!?IssueVie
         const formatted = try formatFieldValue(allocator, entry.value_ptr.*, schema) orelse continue;
         errdefer allocator.free(formatted);
 
-        const label = fieldLabel(names, field_id);
+        const label_duped = try allocator.dupe(u8, fieldLabel(names, field_id));
+        errdefer allocator.free(label_duped);
+
         const row = FieldRow{
-            .label = try allocator.dupe(u8, label),
+            .label = label_duped,
             .value = formatted,
             .field_id = field_id,
         };
@@ -317,6 +319,13 @@ fn appendPaddedCell(allocator: Allocator, out: *std.ArrayList(u8), s: []const u8
 
 fn displayWidth(s: []const u8) usize {
     return std.unicode.utf8CountCodepoints(s) catch s.len;
+}
+
+fn utf8Prefix(s: []const u8, max_bytes: usize) []const u8 {
+    if (s.len <= max_bytes) return s;
+    var limit = max_bytes;
+    while (limit > 0 and (s[limit] & 0xC0) == 0x80) limit -= 1;
+    return s[0..limit];
 }
 
 fn appendJsonString(allocator: Allocator, out: *std.ArrayList(u8), s: []const u8) EncodeError!void {
@@ -597,7 +606,12 @@ fn formatSchemaArray(allocator: Allocator, value: Value, items: ?[]const u8) Enc
             }
             break :blk try formatFieldValue(allocator, item, item_schema);
         };
-        if (piece) |p| try parts.append(allocator, p);
+        if (piece) |p| {
+            parts.append(allocator, p) catch |err| {
+                allocator.free(p);
+                return err;
+            };
+        }
     }
     if (parts.items.len == 0) return null;
 
@@ -869,7 +883,7 @@ fn formatAdfOrNull(allocator: Allocator, obj: std.json.ObjectMap) EncodeError!?[
                 return null;
             }
             if (trimmed.len > section_text_max) {
-                const cut = try std.fmt.allocPrint(allocator, "{s}…", .{trimmed[0..section_text_max]});
+                const cut = try std.fmt.allocPrint(allocator, "{s}…", .{utf8Prefix(trimmed, section_text_max)});
                 buf.deinit(allocator);
                 return cut;
             }
@@ -1025,6 +1039,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
         const fields = if (io.get("fields")) |f| if (f == .object) f.object else null else null;
         for (col_ids.items) |cid| {
             const cell = try searchCell(allocator, io, fields, cid);
+            errdefer allocator.free(cell);
             try cell_grid.append(allocator, cell);
         }
     }
@@ -1230,7 +1245,7 @@ fn writeMdPrimitive(allocator: Allocator, out: *std.ArrayList(u8), value: Value)
         .number_string => |s| try out.print(allocator, "`{s}`", .{s}),
         .string => |s| {
             if (s.len > 200) {
-                try appendEscapedInline(allocator, out, s[0..200]);
+                try appendEscapedInline(allocator, out, utf8Prefix(s, 200));
                 try out.appendSlice(allocator, "…");
             } else {
                 try appendEscapedInline(allocator, out, s);
