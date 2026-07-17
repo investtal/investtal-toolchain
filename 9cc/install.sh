@@ -1,17 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Pure: from newline-separated tag list, prefer highest 9cc-v*, else highest legacy v*
+pick_latest_9cc_tag() {
+    local list="${1:-}" ver=""
+    ver="$(printf '%s\n' "$list" | grep -E '^9cc-v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sed 's/^9cc-v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1 || true)"
+    if [ -n "$ver" ]; then
+        printf '9cc-v%s' "$ver"
+        return 0
+    fi
+    ver="$(printf '%s\n' "$list" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1 || true)"
+    if [ -n "$ver" ]; then
+        printf 'v%s' "$ver"
+        return 0
+    fi
+    return 1
+}
+
+# Resolve latest 9cc release tag: prefer 9cc-v*, else legacy v*
+resolve_latest_9cc_tag() {
+    local tags=""
+    if command -v gh >/dev/null 2>&1; then
+        tags="$(gh api "repos/investtal/investtal-toolchain/releases?per_page=100" --jq '.[].tag_name' 2>/dev/null || true)"
+    else
+        tags="$(curl -fsSL --max-time 15 \
+            'https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100' 2>/dev/null \
+            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+            | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+    fi
+    pick_latest_9cc_tag "$tags"
+}
+
 CC9_HOME="${CC9_HOME:-$HOME/.9cc}"
 CC9_VERSION="${CC9_VERSION:-}"
 if [ -z "$CC9_VERSION" ]; then
-    if command -v gh >/dev/null 2>&1; then
-        CC9_VERSION="$(gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>/dev/null || true)"
-    else
-        CC9_VERSION="$(curl -fsSL --max-time 10 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' 2>/dev/null \
-            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-            | sed -E 's/.*"([^"]+)".*/\1/' \
-            | head -n1)"
-    fi
+    CC9_VERSION="$(resolve_latest_9cc_tag 2>/dev/null || true)"
     [ -n "$CC9_VERSION" ] || CC9_VERSION="v0.5.4"
 fi
 CC9_SOURCE="${CC9_SOURCE:-}"

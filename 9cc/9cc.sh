@@ -33,36 +33,47 @@ cascade_for() {
     esac
 }
 
+# Pure: from newline-separated tag list, prefer highest 9cc-v*, else highest legacy v*
+pick_latest_9cc_tag() {
+    local list="${1:-}" ver=""
+    ver="$(printf '%s\n' "$list" | grep -E '^9cc-v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sed 's/^9cc-v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1 || true)"
+    if [ -n "$ver" ]; then
+        printf '9cc-v%s' "$ver"
+        return 0
+    fi
+    ver="$(printf '%s\n' "$list" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n1 || true)"
+    if [ -n "$ver" ]; then
+        printf 'v%s' "$ver"
+        return 0
+    fi
+    return 1
+}
+
 get_latest_tag() {
-    local api="https://api.github.com/repos/investtal/investtal-toolchain/releases/latest"
-    local resp=""
+    local tags="" resp=""
     if [ -n "${CC9_LATEST_API_FIXTURE:-}" ]; then
         if [ ! -f "$CC9_LATEST_API_FIXTURE" ]; then return 1; fi
         resp="$(cat "$CC9_LATEST_API_FIXTURE")" || return 1
-    elif command -v gh >/dev/null 2>&1; then
-        resp="$(gh api repos/investtal/investtal-toolchain/releases/latest 2>/dev/null)" || return 1
+        tags="$(printf '%s' "$resp" \
+            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+            | sed -E 's/.*"([^"]+)".*/\1/')" || true
+        [ -n "$tags" ] || return 1
+        pick_latest_9cc_tag "$tags"
+        return $?
+    fi
+    if command -v gh >/dev/null 2>&1; then
+        tags="$(gh api "repos/investtal/investtal-toolchain/releases?per_page=100" --jq '.[].tag_name' 2>/dev/null)" || return 1
     else
         command -v curl >/dev/null 2>&1 || { echo "9cc update: curl not found" >&2; return 1; }
-        resp="$(curl -fsSL --max-time 30 "$api" 2>/dev/null)" || return 1
-    fi
-
-    local tag=""
-    if command -v node >/dev/null 2>&1; then
-        tag="$(printf '%s' "$resp" | node -e '
-            let d;
-            try { d = JSON.parse(require("fs").readFileSync(0, "utf8")); }
-            catch (e) { process.exit(1); }
-            const t = d && d.tag_name;
-            if (t && String(t).length) process.stdout.write(String(t));
-            else process.exit(1);
-        ' 2>/dev/null)" || return 1
-    else
-        tag="$(printf '%s' "$resp" \
+        tags="$(curl -fsSL --max-time 30 \
+            'https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100' 2>/dev/null \
             | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-            | sed -E 's/.*"([^"]+)".*/\1/' \
-            | head -n1)"
+            | sed -E 's/.*"([^"]+)".*/\1/')" || return 1
     fi
-    case "$tag" in v*) printf '%s' "$tag" ;; *) return 1 ;; esac
+    [ -n "$tags" ] || return 1
+    pick_latest_9cc_tag "$tags"
 }
 
 do_update() {

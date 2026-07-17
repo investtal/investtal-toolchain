@@ -1,16 +1,48 @@
 $ErrorActionPreference = 'Stop'
-$Home9 = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $env:USERPROFILE '.9cc' }
-$Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
-    $tag = $null
+
+function Select-Latest9ccTag {
+    param([string[]]$Tags)
+    $nine = @(
+        $Tags |
+            Where-Object { $_ -match '^9cc-v\d+\.\d+\.\d+$' } |
+            ForEach-Object { $_.Substring(5) } |
+            Sort-Object { [version]$_ }
+    )
+    if ($nine.Count -gt 0) { return "9cc-v$($nine[-1])" }
+    $legacy = @(
+        $Tags |
+            Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+            ForEach-Object { $_.Substring(1) } |
+            Sort-Object { [version]$_ }
+    )
+    if ($legacy.Count -gt 0) { return "v$($legacy[-1])" }
+    return $null
+}
+
+function Resolve-Latest9ccTag {
+    $tags = @()
     if (Get-Command gh -ErrorAction SilentlyContinue) {
-        $tag = gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>$null
-    }
-    if (-not $tag) {
         try {
-            $resp = Invoke-RestMethod -Uri 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest' -TimeoutSec 10 -ErrorAction Stop
-            if ($resp -and $resp.tag_name) { $tag = $resp.tag_name }
+            $raw = gh api 'repos/investtal/investtal-toolchain/releases?per_page=100' --jq '.[].tag_name' 2>$null
+            if ($raw) {
+                $tags = @($raw -split "[\r\n]+" | Where-Object { $_ })
+            }
         } catch { }
     }
+    if ($tags.Count -eq 0) {
+        try {
+            $resp = Invoke-RestMethod -Uri 'https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100' -TimeoutSec 15 -ErrorAction Stop
+            if ($resp) {
+                $tags = @($resp | ForEach-Object { $_.tag_name } | Where-Object { $_ })
+            }
+        } catch { }
+    }
+    return (Select-Latest9ccTag -Tags $tags)
+}
+
+$Home9 = if ($env:CC9_HOME) { $env:CC9_HOME } else { Join-Path $env:USERPROFILE '.9cc' }
+$Ver = if ($env:CC9_VERSION) { $env:CC9_VERSION } else {
+    $tag = Resolve-Latest9ccTag
     if ($tag) { $tag } else { 'v0.5.4' }
 }
 if (-not $env:CC9_BIN_DIR) {
