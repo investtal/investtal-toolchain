@@ -99,8 +99,14 @@ pub fn exchangeCode(
     });
     defer result.deinit(allocator);
     return switch (result) {
-        .ok => |r| try parseTokenJson(allocator, r.body, nowUnix(client.io)),
-        .err => error.TokenExchangeFailed,
+        .ok => |r| {
+            if (r.body.len == 0) return error.TokenExchangeEmptyBody;
+            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch return error.TokenExchangeParseFailed;
+        },
+        .err => |e| {
+            std.log.err("token exchange HTTP {d}: {s}", .{ e.status orelse 0, e.message });
+            return error.TokenExchangeFailed;
+        },
     };
 }
 
@@ -127,8 +133,16 @@ pub fn refresh(
     });
     defer result.deinit(allocator);
     return switch (result) {
-        .ok => |r| try parseTokenJson(allocator, r.body, nowUnix(client.io)),
-        .err => error.TokenRefreshFailed,
+        .ok => |r| {
+            if (r.body.len == 0) return error.TokenRefreshEmptyBody;
+            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch return error.TokenRefreshParseFailed;
+        },
+        .err => |e| {
+            if (client.verbose) {
+                std.log.err("token refresh HTTP {d}: {s}", .{ e.status orelse 0, e.message });
+            }
+            return error.TokenRefreshFailed;
+        },
     };
 }
 
