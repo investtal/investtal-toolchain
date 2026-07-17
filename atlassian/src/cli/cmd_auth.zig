@@ -33,9 +33,9 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         const cloud = if (tokens) |t| (t.cloud_id orelse cfg.cloud_id orelse "") else (cfg.cloud_id orelse "");
         const exp: i64 = if (tokens) |t| t.expires_at_unix else 0;
         const scope = if (tokens) |t| (t.scope orelse "") else "";
-        const has_board = std.mem.indexOf(u8, scope, "read:board-scope:jira-software") != null;
-        const has_issue_details = std.mem.indexOf(u8, scope, "read:issue-details:jira") != null or std.mem.indexOf(u8, scope, "read:jira-work") != null;
-        const agile_ok = has_board;
+        const has_board = auth_oauth.scopeContains(scope, "read:board-scope:jira-software");
+        const has_issue_details = auth_oauth.scopeContains(scope, "read:issue-details:jira") or auth_oauth.scopeContains(scope, "read:jira-work");
+        const agile_ok = has_board and has_issue_details;
         const text = std.fmt.allocPrint(allocator,
             \\mode={s}
             \\url={s}
@@ -51,11 +51,10 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             cloud,
             exp,
             if (scope.len > 0) scope else "(none stored — re-login)",
-            if (agile_ok) "ok" else "MISSING (board backlog/sprint need read:board-scope:jira-software)",
+            if (agile_ok) "ok" else "MISSING (need read:board-scope:jira-software + read:issue-details:jira|read:jira-work)",
             if (agile_ok) "Agile board/sprint APIs should work" else "Add Jira Software scopes on the OAuth app, then: atlassian auth login",
         }) catch return exit_codes.generic;
         defer allocator.free(text);
-        _ = has_issue_details;
         render.successText(ctx, text);
         return exit_codes.ok;
     }
