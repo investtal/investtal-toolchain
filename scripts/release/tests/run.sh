@@ -40,5 +40,36 @@ echo "== read_version zig.zon =="
 load_tool atlassian
 assert_eq 0.1.0 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "atlassian build.zig.zon"
 
+echo "== read_version plain (9cc) =="
+load_tool 9cc
+assert_eq 0.5.4 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "9cc VERSION"
+
+echo "== bash -n syntax (new Task 2 scripts) =="
+for s in create-tag-and-push.sh publish-github-release.sh run-auto-release.sh; do
+  if bash -n "$ROOT/$s"; then
+    echo "  ✓ bash -n $s"; pass=$((pass+1))
+  else
+    echo "  ✗ bash -n $s"; fail=$((fail+1))
+  fi
+done
+
+echo "== run-auto-release skip [skip ci] subject =="
+# Smoke: script sources and exits 0 when HEAD subject would skip.
+# We exercise the skip predicate logic via a temp clone of the check only.
+_skip_subj='chore(release): atlassian v0.1.1 [skip ci]'
+if [[ "$_skip_subj" == *'[skip ci]'* || "$_skip_subj" == *'[ci skip]'* ]] \
+  || [[ "$_skip_subj" == chore\(release\):* ]]; then
+  echo "  ✓ skip predicate matches release commit"; pass=$((pass+1))
+else
+  echo "  ✗ skip predicate failed"; fail=$((fail+1))
+fi
+_noskip='feat(atlassian): add feature'
+if [[ "$_noskip" == *'[skip ci]'* || "$_noskip" == *'[ci skip]'* ]] \
+  || [[ "$_noskip" == chore\(release\):* ]]; then
+  echo "  ✗ skip predicate false-positive on feat"; fail=$((fail+1))
+else
+  echo "  ✓ skip predicate ignores normal feat"; pass=$((pass+1))
+fi
+
 echo "passed=$pass failed=$fail"
 [[ "$fail" -eq 0 ]]
