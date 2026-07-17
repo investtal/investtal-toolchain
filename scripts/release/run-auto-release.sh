@@ -203,14 +203,21 @@ while IFS= read -r t || [[ -n "$t" ]]; do
 done <"$_tools_tmp"
 rm -f "$_tools_tmp"
 
-# FORCE_RELEASE_TOOLS=atlassian,9cc — manual recovery / ops rebuild
+# FORCE_RELEASE_TOOLS=atlassian,9cc — manual recovery / ops rebuild.
+# Portable comma-split (no set -- / unquoted glob expansion).
 if [[ -n "${FORCE_RELEASE_TOOLS:-}" ]]; then
-  _force_ifs="$IFS"
-  IFS=','
-  # shellcheck disable=SC2086
-  set -- ${FORCE_RELEASE_TOOLS}
-  IFS="$_force_ifs"
-  for t in "$@"; do
+  _rest_force="${FORCE_RELEASE_TOOLS}"
+  while [[ -n "$_rest_force" ]]; do
+    case "$_rest_force" in
+      *,*)
+        t="${_rest_force%%,*}"
+        _rest_force="${_rest_force#*,}"
+        ;;
+      *)
+        t="$_rest_force"
+        _rest_force=""
+        ;;
+    esac
     t="$(echo "$t" | tr -d '[:space:]')"
     [[ -n "$t" ]] || continue
     load_tool "$t" >/dev/null
