@@ -26,7 +26,7 @@ pub fn interactiveLogin(allocator: Allocator, io: Io, cfg: config_mod.Config, sc
     const url = try oauth.authorizeUrl(allocator, client_id, redirect_uri, state, scopes);
     defer allocator.free(url);
 
-    // Listen before openBrowser so a fast consent redirect cannot race the bind.
+    // Bind before openBrowser to avoid a race on fast consent redirects.
     const address = try Io.net.IpAddress.parseIp4("127.0.0.1", oauth.DEFAULT_CALLBACK_PORT);
     var server = try address.listen(io, .{ .reuse_address = true });
     defer server.deinit(io);
@@ -83,17 +83,14 @@ fn builtinOs() enum { macos, linux, windows, other } {
     };
 }
 
-// JWT auth codes + Chrome headers; headroom so headers usually fit one fillMore.
 const CALLBACK_READ_BUF: usize = 64 * 1024;
 
 fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expected_state: []const u8) ![]u8 {
-    // Skip non-callback sockets (favicon/noise) until code+state arrive.
     while (true) {
         var stream = try server.accept(io);
         defer stream.close(io);
 
         const req = readHttpHeaders(allocator, io, &stream) catch |err| {
-            // Only OOM is fatal; RequestTooLarge / incomplete / read errors are noise.
             if (err == error.OutOfMemory) return err;
             continue;
         };
@@ -116,7 +113,6 @@ fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expecte
         );
         defer allocator.free(response);
 
-        // Best-effort success page; browser may already have closed after redirect.
         var wbuf: [1024]u8 = undefined;
         var writer = stream.writer(io, &wbuf);
         writer.interface.writeAll(response) catch {};
@@ -126,8 +122,7 @@ fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expecte
     }
 }
 
-/// Read until CRLFCRLF. Uses `fillMore` (one OS read); `readSliceShort` waits for
-/// a full buffer and hung forever when Chrome sent headers then waited for a reply.
+// fillMore = one OS read; readSliceShort blocks until the buffer is full (OAuth hang).
 fn readHttpHeaders(allocator: Allocator, io: Io, stream: *Io.net.Stream) ![]u8 {
     var rbuf: [CALLBACK_READ_BUF]u8 = undefined;
     var reader = stream.reader(io, &rbuf);

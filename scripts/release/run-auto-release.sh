@@ -13,17 +13,14 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 cd "$REPO_ROOT"
 
-# True if this tool has never been tagged as {tool}-v* (local after fetch --tags).
 tool_never_tagged() {
   local tool="$1"
-  # List local tags matching prefix; empty → never released under new scheme.
   if git tag -l "${tool}-v*" 2>/dev/null | grep -q .; then
     return 1
   fi
   return 0
 }
 
-# Append unique tool name to tools array (bash 3.2 — no associative arrays).
 tools_append_unique() {
   local candidate="$1" t
   for t in "${tools[@]+"${tools[@]}"}"; do
@@ -32,7 +29,6 @@ tools_append_unique() {
   tools+=("$candidate")
 }
 
-# Package binary assets (if needed) and publish GitHub Release for tool@ver.
 package_and_publish() {
   local tool="$1" ver="$2"
   load_tool "$tool"
@@ -56,23 +52,20 @@ package_and_publish() {
   "$RELEASE_ROOT/publish-github-release.sh" "$tag" "${asset_dir:-}"
 }
 
-# Parse "chore(release): {tool} v{ver} ..." → sets _rel_tool _rel_ver
+# Sets _rel_tool and _rel_ver from "chore(release): {tool} v{ver} ..."
 parse_release_subject() {
   local subject="$1"
   local rest tool_part ver_part
   rest="${subject#chore(release): }"
-  # strip optional leading spaces (portable)
   rest="${rest#"${rest%%[![:space:]]*}"}"
   tool_part="${rest%% *}"
   ver_part="${rest#* }"
   ver_part="${ver_part%% *}"
-  # strip optional leading v
   if [[ "$ver_part" == v* ]]; then
     ver_part="${ver_part#v}"
   fi
   [[ -n "$tool_part" && -n "$ver_part" ]] \
     || die "cannot parse release subject: $subject"
-  # basic semver sanity
   case "$ver_part" in
     [0-9]*.[0-9]*.[0-9]*) ;;
     *) die "invalid version in release subject: $subject" ;;
@@ -81,15 +74,12 @@ parse_release_subject() {
   _rel_ver="$ver_part"
 }
 
-# Resolve associated PR title for a commit.
-# Prefer: gh --jq → curl+python3 → curl+sed best-effort.
-# Prints title or "none". Returns non-zero only when fetch/parse hard-fails.
+# Prints PR title for commit, or "none". Non-zero only on hard fetch/parse failure.
 resolve_pr_title() {
   local sha="$1" repo="$2" token="$3"
   local title="" pulls=""
 
   if command -v gh >/dev/null 2>&1; then
-    # gh uses GH_TOKEN/GITHUB_TOKEN from env when set
     title="$(gh api "repos/${repo}/commits/${sha}/pulls" \
       --jq '.[0].title // "none"' 2>/dev/null || true)"
     if [[ -n "$title" ]]; then
@@ -99,7 +89,6 @@ resolve_pr_title() {
   fi
 
   if [[ -z "$token" ]]; then
-    # No token and gh failed/missing → treat as no PR
     printf 'none\n'
     return 0
   fi
@@ -131,8 +120,6 @@ except Exception:
     fi
   fi
 
-  # Pure bash/sed best-effort for first "title": "..."
-  # Empty array → none; otherwise take first title field.
   if [[ "$pulls" == "[]" ]]; then
     printf 'none\n'
     return 0
@@ -146,13 +133,10 @@ except Exception:
     return 0
   fi
 
-  # Response present but unparseable
   return 1
 }
 
-# Resolve associated PR base.sha for a commit (empty if none / unresolvable).
-# Multi-commit rebase/squash merges onto main make HEAD^ see only the last commit;
-# PR base covers the full PR range so path-based tool detection works.
+# PR base covers full rebase/squash ranges; HEAD^ only sees the tip commit.
 resolve_pr_base_sha() {
   local sha="$1" repo="$2" token="$3"
   local base="" pulls=""
@@ -193,7 +177,6 @@ except Exception:
     fi
   fi
 
-  # sed best-effort: first "sha" under base object is fragile; look for base.sha path
   base="$(printf '%s' "$pulls" \
     | tr '\n' ' ' \
     | sed -E 's/.*"base"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{7,40})".*/\1/' \
@@ -203,12 +186,7 @@ except Exception:
   fi
 }
 
-# Resolve BASE_SHA for change detection.
-# Order:
-#   1) explicit BASE_SHA env (tests / ops override)
-#   2) merge commit → first parent
-#   3) associated PR base.sha (multi-commit rebase/squash onto main)
-#   4) HEAD^ / HEAD~1
+# BASE_SHA: env override → merge first-parent → PR base → HEAD^
 resolve_base_sha() {
   local sha="" head_sha repo token pr_base
   if [[ -n "${BASE_SHA:-}" ]]; then
@@ -216,7 +194,6 @@ resolve_base_sha() {
     return 0
   fi
 
-  # True merge commit (2 parents): range is first-parent → HEAD
   if git rev-parse -q --verify HEAD^2 >/dev/null; then
     git rev-parse HEAD^1
     return 0
@@ -227,13 +204,11 @@ resolve_base_sha() {
   token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
   pr_base="$(resolve_pr_base_sha "$head_sha" "$repo" "$token" || true)"
   if [[ -n "$pr_base" ]]; then
-    # Ensure object exists (shallow agents may need a deepen/fetch)
     if ! git rev-parse -q --verify "${pr_base}^{commit}" >/dev/null 2>&1; then
       git fetch --depth=1 origin "$pr_base" 2>/dev/null || true
       git fetch --deepen=50 2>/dev/null || true
     fi
     if git rev-parse -q --verify "${pr_base}^{commit}" >/dev/null 2>&1; then
-      # Refuse if pr_base is not an ancestor of HEAD (stale/wrong association)
       if git merge-base --is-ancestor "$pr_base" HEAD 2>/dev/null; then
         echo "release: BASE_SHA from associated PR base ($pr_base)" >&2
         printf '%s\n' "$pr_base"
@@ -258,8 +233,7 @@ resolve_base_sha() {
 
 subject="$(git log -1 --pretty=%s)"
 
-# Pure [skip ci]/[ci skip] that is NOT a release commit → do not release.
-# chore(release): … [skip ci] is retriable (ensure push/package/publish only).
+# [skip ci] skips release unless this is a retriable chore(release): commit.
 if [[ "$subject" != chore\(release\):* ]]; then
   if [[ "$subject" == *'[skip ci]'* || "$subject" == *'[ci skip]'* ]]; then
     echo "skip release: $subject"
@@ -267,7 +241,6 @@ if [[ "$subject" != chore\(release\):* ]]; then
   fi
 fi
 
-# Retriable path: HEAD is a release commit — no bump, ensure push + publish.
 if [[ "$subject" == chore\(release\):* ]]; then
   echo "retriable publish for release commit: $subject"
   parse_release_subject "$subject"
@@ -281,18 +254,14 @@ BASE_SHA="$(resolve_base_sha)"
 export BASE_SHA
 export HEAD_SHA="${HEAD_SHA:-HEAD}"
 
-# Portable: no mapfile (bash 3.2)
 tools=()
 _tools_tmp="$(mktemp)"
-# detect-changed-tools exits 0 with empty stdout when nothing matched
 "$RELEASE_ROOT/detect-changed-tools.sh" >"$_tools_tmp" || true
 while IFS= read -r t || [[ -n "$t" ]]; do
   [[ -n "$t" ]] && tools+=("$t")
 done <"$_tools_tmp"
 rm -f "$_tools_tmp"
 
-# FORCE_RELEASE_TOOLS=atlassian,9cc — manual recovery / ops rebuild.
-# Portable comma-split (no set -- / unquoted glob expansion).
 if [[ -n "${FORCE_RELEASE_TOOLS:-}" ]]; then
   _rest_force="${FORCE_RELEASE_TOOLS}"
   while [[ -n "$_rest_force" ]]; do
@@ -314,8 +283,7 @@ if [[ -n "${FORCE_RELEASE_TOOLS:-}" ]]; then
   done
 fi
 
-# First-time bootstrap: tools that never got a {tool}-v* tag (e.g. first main
-# release failed at preflight before tagging). Ship current VERSION as-is.
+# Bootstrap tools that never got a {tool}-v* tag (ship current VERSION as-is).
 _bootstrap=()
 while IFS= read -r line || [[ -n "$line" ]]; do
   [[ "$line" =~ ^#|^$ ]] && continue
@@ -333,7 +301,6 @@ if [[ ${#tools[@]} -eq 0 ]]; then
   exit 0
 fi
 
-# Resolve PR title for HEAD via GitHub REST (associated pull requests)
 token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 sha="$(git rev-parse HEAD)"
 repo="${GITHUB_REPOSITORY:-investtal/investtal-toolchain}"
@@ -343,8 +310,6 @@ if ! title="$(resolve_pr_title "$sha" "$repo" "$token")"; then
 fi
 
 level="$("$RELEASE_ROOT/detect-bump-level.sh" "$title")"
-# Bootstrap-only (no path changes + no force): allow patch when there is no PR title.
-# Path-based releases still require a real PR title level.
 _only_bootstrap=1
 for tool in "${tools[@]}"; do
   _is_boot=0
@@ -376,12 +341,10 @@ for tool in "${tools[@]}"; do
   done
 
   if [[ "$_is_boot" -eq 1 ]]; then
-    # First tag: ship version file as-is (e.g. atlassian-v0.1.0, 9cc-v0.5.4).
     new_ver="$cur"
     tag="${tool}-v${new_ver}"
     echo "initial tag $tag from current VERSION (no bump)"
   else
-    # Compute target version without writing yet; if tag already exists, skip bump.
     new_ver="$(semver_bump "$cur" "$level")"
     tag="${tool}-v${new_ver}"
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then

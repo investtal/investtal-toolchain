@@ -45,7 +45,6 @@ assert_eq 1.0.0 "$(semver_bump 0.9.9 major)" "major"
 assert_eq 0.1.6 "$(semver_bump 0.1.5 patch)" "patch"
 
 echo "== read_version zig.zon =="
-# Fixture only — do not pin live package versions (they bump on every release).
 _tmpd="$(mktemp -d)"
 cat > "$_tmpd/build.zig.zon" <<'ZON'
 .{
@@ -58,7 +57,6 @@ assert_eq 3.2.1 "$(read_version "$_tmpd/build.zig.zon" zig.zon)" "read_version z
 rm -rf "$_tmpd"
 
 echo "== write_version zig.zon syncs CLI VERSION const =="
-# Isolated package tree so write_version + sync_cli_version_const never touch the repo.
 _tmpd="$(mktemp -d)"
 cp "$REPO_ROOT/atlassian/build.zig.zon" "$_tmpd/build.zig.zon"
 mkdir -p "$_tmpd/src/cli"
@@ -154,17 +152,13 @@ assert_eq no "$(_is_main HEAD feature/x)" "detached feature refused"
 assert_eq yes "$(_is_main feature/x main)" "env main wins (Jenkins)"
 
 echo "== tag-exists → skip bump (compute only) =="
-# current 0.1.0 + patch → 0.1.1; if tag atlassian-v0.1.1 exists, skip write
 _cur="0.1.0"
 _new="$(semver_bump "$_cur" patch)"
 assert_eq 0.1.1 "$_new" "compute next without writing"
 _tag="atlassian-v${_new}"
-# We only assert the naming contract used by orchestrator
 assert_eq "atlassian-v0.1.1" "$_tag" "target tag name from current+level"
 
 echo "== multi-commit rebase: tip-only range misses tools =="
-# Simulate PR with atlassian fix then a release-test-only tip (real PR #18 failure mode).
-# HEAD^ range → no tool; full PR range → atlassian.
 _paths_tip=$'scripts/release/tests/run.sh'
 _paths_pr=$'atlassian/src/http/client.zig\nscripts/release/tests/run.sh'
 got="$(printf '%s\n' "$_paths_tip" | "$ROOT/detect-changed-tools.sh" | tr '\n' ' ' | xargs)"
@@ -173,7 +167,6 @@ got="$(printf '%s\n' "$_paths_pr" | "$ROOT/detect-changed-tools.sh" | tr '\n' ' 
 assert_eq atlassian "$got" "full PR range detects atlassian"
 
 echo "== parse PR base.sha from commits/pulls JSON =="
-# Mirrors resolve_pr_base_sha python/gh path (structure only)
 _json='[{"base":{"sha":"abc123def4567890abc123def4567890abc123de","ref":"main"},"title":"fix: x"}]'
 _base="$(printf '%s' "$_json" | python3 -c '
 import sys, json

@@ -7,7 +7,6 @@ const ApiError = @import("error.zig").ApiError;
 pub const Request = struct {
     method: http.Method = .GET,
     url: []const u8,
-    /// `Authorization` value (`Bearer …` / `Basic …`); `null` omits the header.
     auth_header: ?[]const u8 = null,
     body: ?[]const u8 = null,
     content_type: []const u8 = "application/json",
@@ -134,8 +133,7 @@ pub const Client = struct {
         var client: http.Client = .{ .allocator = self.allocator, .io = self.io };
         defer client.deinit();
 
-        // Allocating owns the buffer; fromArrayList would empty a source list and
-        // leave us reading an empty ArrayList after fetch.
+        // Prefer Allocating.init: fromArrayList empties the source list.
         var body_aw: Io.Writer.Allocating = .init(self.allocator);
         defer body_aw.deinit();
 
