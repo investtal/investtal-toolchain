@@ -535,6 +535,48 @@ else
     echo "  FAIL: get_latest_tag missing gh preference"; FAIL=$((FAIL+1))
 fi
 
+echo "Cycle 18: pick_latest_9cc_tag prefers 9cc-v* over legacy v*"
+list=$'v0.5.4\n9cc-v0.6.0\natlassian-v0.1.0\n9cc-v0.5.9'
+assert_eq "$(pick_latest_9cc_tag "$list")" "9cc-v0.6.0" "prefers highest 9cc-v* over legacy"
+
+list=$'v0.5.4\nv0.4.0\natlassian-v1.0.0\nfoo-v9.9.9'
+assert_eq "$(pick_latest_9cc_tag "$list")" "v0.5.4" "falls back to highest legacy v*"
+
+list=$'9cc-v0.5.4\n9cc-v0.5.10\n9cc-v0.5.9'
+assert_eq "$(pick_latest_9cc_tag "$list")" "9cc-v0.5.10" "numeric sort on 9cc-v patch"
+
+list=$'atlassian-v0.1.0\nother-v1.2.3'
+if pick_latest_9cc_tag "$list" >/dev/null 2>&1; then
+    echo "  FAIL: unrelated tags should exit 1"; FAIL=$((FAIL+1))
+else
+    echo "  ok: unrelated tags exit 1"; PASS=$((PASS+1))
+fi
+
+list=$'v0.1.0'
+assert_eq "$(pick_latest_9cc_tag "$list")" "v0.1.0" "single legacy tag"
+
+# Fixture path: multi-tag release list still picks 9cc-v*
+API_MULTI="/tmp/9cc-latest-multi.json"
+cat > "$API_MULTI" <<'JSON'
+[
+  {"tag_name":"v0.5.4"},
+  {"tag_name":"9cc-v0.6.0"},
+  {"tag_name":"atlassian-v0.1.0"},
+  {"tag_name":"9cc-v0.5.9"}
+]
+JSON
+assert_eq "$(CC9_LATEST_API_FIXTURE="$API_MULTI" get_latest_tag)" "9cc-v0.6.0" "get_latest_tag multi-fixture prefers 9cc-v*"
+rm -f "$API_MULTI"
+
+# install.sh shares pick_latest_9cc_tag
+if grep -q 'pick_latest_9cc_tag' "$DIR/install.sh" \
+   && grep -q 'resolve_latest_9cc_tag' "$DIR/install.sh" \
+   && grep -q '9cc-v' "$DIR/install.sh"; then
+    echo "  ok: install.sh has 9cc-v resolve helpers"; PASS=$((PASS+1))
+else
+    echo "  FAIL: install.sh missing 9cc-v resolve helpers"; FAIL=$((FAIL+1))
+fi
+
 echo "----"
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ] || exit 1

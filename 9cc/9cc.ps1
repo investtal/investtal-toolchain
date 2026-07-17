@@ -44,27 +44,56 @@ function Get-NextModel { param([string]$Current,[switch]$NoFree)
     throw "9cc: no successor for '$Current'"
 }
 
+function Select-Latest9ccTag {
+    param([string[]]$Tags)
+    $nine = @(
+        $Tags |
+            Where-Object { $_ -match '^9cc-v\d+\.\d+\.\d+$' } |
+            ForEach-Object { $_.Substring(5) } |
+            Sort-Object { [version]$_ }
+    )
+    if ($nine.Count -gt 0) { return "9cc-v$($nine[-1])" }
+    $legacy = @(
+        $Tags |
+            Where-Object { $_ -match '^v\d+\.\d+\.\d+$' } |
+            ForEach-Object { $_.Substring(1) } |
+            Sort-Object { [version]$_ }
+    )
+    if ($legacy.Count -gt 0) { return "v$($legacy[-1])" }
+    return $null
+}
+
 function Get-LatestTag {
+    $tags = @()
     if ($env:CC9_LATEST_API_FIXTURE -and (Test-Path $env:CC9_LATEST_API_FIXTURE)) {
         try {
             $resp = Get-Content -Raw $env:CC9_LATEST_API_FIXTURE | ConvertFrom-Json -ErrorAction Stop
-            return $resp.tag_name
+            if ($resp -is [System.Array]) {
+                $tags = @($resp | ForEach-Object { $_.tag_name } | Where-Object { $_ })
+            } elseif ($resp.tag_name) {
+                $tags = @($resp.tag_name)
+            }
         } catch { return $null }
+        return (Select-Latest9ccTag -Tags $tags)
     }
     if (Get-Command gh -ErrorAction SilentlyContinue) {
         try {
-            $tag = gh api repos/investtal/investtal-toolchain/releases/latest --jq '.tag_name' 2>$null
-            if ($tag -and $tag -match '^v') { return $tag.Trim() }
+            $raw = gh api 'repos/investtal/investtal-toolchain/releases?per_page=100' --jq '.[].tag_name' 2>$null
+            if ($raw) {
+                $tags = @($raw -split "[\r\n]+" | Where-Object { $_ })
+            }
         } catch { }
     }
-    $api = 'https://api.github.com/repos/investtal/investtal-toolchain/releases/latest'
-    try {
-        $resp = Invoke-RestMethod -Uri $api -TimeoutSec 30 -ErrorAction Stop
-    } catch { return $null }
-    if ($resp -and $resp.tag_name -and $resp.tag_name -match '^v') {
-        return $resp.tag_name
+    if ($tags.Count -eq 0) {
+        $api = 'https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100'
+        try {
+            $resp = Invoke-RestMethod -Uri $api -TimeoutSec 30 -ErrorAction Stop
+            if ($resp) {
+                $tags = @($resp | ForEach-Object { $_.tag_name } | Where-Object { $_ })
+            }
+        } catch { return $null }
     }
-    return $null
+    return (Select-Latest9ccTag -Tags $tags)
 }
 
 function Update-9cc {

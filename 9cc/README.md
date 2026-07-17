@@ -25,8 +25,8 @@ gh api repos/investtal/investtal-toolchain/contents/9cc/install.ps1 --jq '.conte
 Pin a release or commit:
 
 ```sh
-gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=v0.5.3" --jq '.content' | base64 -d | bash
-gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.5.3 bash
+gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=9cc-v0.5.4" --jq '.content' | base64 -d | bash
+gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=9cc-v0.5.4 bash
 ```
 
 Check: `9cc version`. Update: `9cc update`.
