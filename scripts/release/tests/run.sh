@@ -45,11 +45,20 @@ assert_eq 1.0.0 "$(semver_bump 0.9.9 major)" "major"
 assert_eq 0.1.6 "$(semver_bump 0.1.5 patch)" "patch"
 
 echo "== read_version zig.zon =="
-load_tool atlassian
-assert_eq 0.1.0 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "atlassian build.zig.zon"
+# Fixture only — do not pin live package versions (they bump on every release).
+_tmpd="$(mktemp -d)"
+cat > "$_tmpd/build.zig.zon" <<'ZON'
+.{
+    .name = .atlassian,
+    .version = "3.2.1",
+    .paths = .{""},
+}
+ZON
+assert_eq 3.2.1 "$(read_version "$_tmpd/build.zig.zon" zig.zon)" "read_version zig.zon fixture"
+rm -rf "$_tmpd"
 
 echo "== write_version zig.zon syncs CLI VERSION const =="
-# Temp copies so the working tree stays at 0.1.0
+# Isolated package tree so write_version + sync_cli_version_const never touch the repo.
 _tmpd="$(mktemp -d)"
 cp "$REPO_ROOT/atlassian/build.zig.zon" "$_tmpd/build.zig.zon"
 mkdir -p "$_tmpd/src/cli"
@@ -61,8 +70,10 @@ assert_eq 9.8.7 "$_cli_ver" "CLI root.zig VERSION stays in sync"
 rm -rf "$_tmpd"
 
 echo "== read_version plain (9cc) =="
-load_tool 9cc
-assert_eq 0.5.4 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "9cc VERSION"
+_tmpd="$(mktemp -d)"
+printf '%s\n' '7.6.5' > "$_tmpd/VERSION"
+assert_eq 7.6.5 "$(read_version "$_tmpd/VERSION" plain)" "read_version plain fixture"
+rm -rf "$_tmpd"
 
 echo "== bash -n syntax (release scripts) =="
 for s in bump-version.sh create-tag-and-push.sh detect-bump-level.sh detect-changed-tools.sh \
