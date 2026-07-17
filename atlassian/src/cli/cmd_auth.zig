@@ -36,6 +36,9 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         const has_board = auth_oauth.scopeContains(scope, "read:board-scope:jira-software");
         const has_issue_details = auth_oauth.scopeContains(scope, "read:issue-details:jira") or auth_oauth.scopeContains(scope, "read:jira-work");
         const agile_ok = has_board and has_issue_details;
+        const conf_ok = auth_oauth.scopeContains(scope, "read:space:confluence") and
+            auth_oauth.scopeContains(scope, "read:page:confluence");
+        const conf_write_ok = auth_oauth.scopeContains(scope, "write:page:confluence");
         const text = std.fmt.allocPrint(allocator,
             \\mode={s}
             \\url={s}
@@ -43,6 +46,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             \\expires_at_unix={d}
             \\scope={s}
             \\agile_board_scope={s}
+            \\confluence_scope={s}
             \\hint={s}
             \\
         , .{
@@ -52,7 +56,18 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             exp,
             if (scope.len > 0) scope else "(none stored — re-login)",
             if (agile_ok) "ok" else "MISSING (need read:board-scope:jira-software + read:issue-details:jira|read:jira-work)",
-            if (agile_ok) "Agile board/sprint APIs should work" else "Add Jira Software scopes on the OAuth app, then: atlassian auth login",
+            if (conf_ok and conf_write_ok)
+                "ok"
+            else if (conf_ok)
+                "read-ok write-MISSING (need write:page:confluence for page create/update)"
+            else
+                "MISSING (need read:space:confluence + read:page:confluence for v2 space/page)",
+            if (!conf_ok)
+                "Add Confluence granular scopes on the OAuth app, revoke app access, then: atlassian auth login"
+            else if (!agile_ok)
+                "Add Jira Software scopes on the OAuth app, then: atlassian auth login"
+            else
+                "Agile + Confluence v2 scopes look good",
         }) catch return exit_codes.generic;
         defer allocator.free(text);
         render.successText(ctx, text);
@@ -75,43 +90,56 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         if (cfg.source_path) |p| config_mod.save(allocator, io, cfg, p) catch {};
 
         const granted = tokens.scope orelse "";
-        var miss_buf: [8][]const u8 = undefined;
-        const missing = auth_oauth.missingAgileScopes(granted, &miss_buf);
-        if (missing.len > 0) {
+        var miss_agile_buf: [8][]const u8 = undefined;
+        var miss_conf_buf: [8][]const u8 = undefined;
+        const missing_agile = auth_oauth.missingAgileScopes(granted, &miss_agile_buf);
+        const missing_conf = auth_oauth.missingConfluenceScopes(granted, &miss_conf_buf);
 
+        if (missing_agile.len > 0 or missing_conf.len > 0) {
             var msg: std.ArrayList(u8) = .empty;
             defer msg.deinit(allocator);
-            msg.appendSlice(allocator, "login ok (platform Jira)\n") catch {};
-            msg.appendSlice(allocator, "WARNING: token is MISSING Jira Software scopes required for board/backlog/sprint:\n") catch {};
-            for (missing) |s| {
-                msg.print(allocator, "  - {s}\n", .{s}) catch {};
+            msg.appendSlice(allocator, "login ok (partial scopes)\n") catch {};
+
+            if (missing_agile.len > 0) {
+                msg.appendSlice(allocator, "WARNING: token is MISSING Jira Software scopes (board/backlog/sprint):\n") catch {};
+                for (missing_agile) |s| {
+                    msg.print(allocator, "  - {s}\n", .{s}) catch {};
+                }
+            }
+            if (missing_conf.len > 0) {
+                msg.appendSlice(allocator, "WARNING: token is MISSING Confluence v2 scopes (space/page):\n") catch {};
+                for (missing_conf) |s| {
+                    msg.print(allocator, "  - {s}\n", .{s}) catch {};
+                }
             }
             msg.appendSlice(allocator,
                 \\
                 \\Atlassian only grants scopes that are BOTH:
-                \\  (a) requested by the CLI (already done), AND
-                \\  (b) enabled on the OAuth app under Permissions → **Jira Software API**
-                \\      (this is separate from classic "Jira API" / read:jira-work)
+                \\  (a) requested by the CLI (already done on this login), AND
+                \\  (b) enabled on the OAuth app under Permissions
                 \\
                 \\Fix:
-                \\  1) https://developer.atlassian.com/console/myapps/ → your app
-                \\  2) Permissions → add **Jira Software API** → enable:
-                \\       read:board-scope:jira-software
-                \\       read:sprint:jira-software
-                \\       read:issue-details:jira
-                \\       read:project:jira
-                \\  3) https://id.atlassian.com/manage-profile/apps → remove this app
-                \\  4) atlassian auth login again
-                \\  5) atlassian auth status  → agile_board_scope=ok
+                \\  1) https://developer.atlassian.com/console/myapps/ → your app → Permissions
+                \\  2) **Jira Software API** (not only classic Jira API): board/sprint/issue-details
+                \\  3) **Confluence API** granular scopes (classic content-only is NOT enough for v2):
+                \\       read:space:confluence
+                \\       read:page:confluence
+                \\       write:page:confluence
+                \\       delete:page:confluence
+                \\     plus classic if available: read:confluence-space.summary, read/write:confluence-content*
+                \\  4) https://id.atlassian.com/manage-profile/apps → **Remove** this app
+                \\     (refresh never adds new scopes; old grant must be revoked)
+                \\  5) atlassian auth login again  (use the rebuilt CLI)
+                \\  6) atlassian auth status  → agile_board_scope=ok AND confluence_scope=ok
                 \\
-                \\Until then, use platform JQL (works with current token):
-                \\  atlassian --markdown jira board backlog --project IVT --assignee me
-                \\  atlassian --markdown jira issue search --assignee me --jql 'project = IVT'
+                \\You do NOT need to reinstall the CLI package — only rebuild/update the binary
+                \\so DEFAULT_SCOPES includes the new Confluence granular scopes, then re-login.
+                \\
             ) catch {};
             render.successText(ctx, msg.items);
             return exit_codes.ok;
         }
-        render.successText(ctx, "login ok (platform Jira + Agile board scopes)");
+        render.successText(ctx, "login ok (Jira platform + Agile + Confluence v2 scopes)");
         return exit_codes.ok;
     }
 
