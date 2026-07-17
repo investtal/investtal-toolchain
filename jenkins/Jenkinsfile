@@ -140,14 +140,12 @@ pipeline {
                         fi
 
                         git fetch --tags --prune
-                        # Shallow clones break HEAD^ / change detection — deepen when possible
+                        # Shallow clones lack parents for change detection
                         git fetch --unshallow 2>/dev/null || git fetch --deepen=50 || true
 
-                        # Do NOT force BASE_SHA=HEAD^ here. Rebase/squash merges put several
-                        # PR commits on main; HEAD^ only sees the tip commit and can miss
-                        # tool path changes. run-auto-release.sh resolves BASE_SHA as:
-                        #   merge first-parent → associated PR base.sha → HEAD^
-                        # Ops override: BASE_SHA=... or FORCE_RELEASE_TOOLS=atlassian,9cc
+                        # BASE_SHA left unset so run-auto-release.sh can use PR base
+                        # (HEAD^ alone misses multi-commit rebase merges).
+                        # Override: BASE_SHA=… or FORCE_RELEASE_TOOLS=atlassian,9cc
                         bash scripts/release/run-auto-release.sh
                     '''
                 }
