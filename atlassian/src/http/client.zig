@@ -134,9 +134,9 @@ pub const Client = struct {
         var client: http.Client = .{ .allocator = self.allocator, .io = self.io };
         defer client.deinit();
 
-        var body_list: std.ArrayList(u8) = .empty;
-        errdefer body_list.deinit(self.allocator);
-        var body_aw: Io.Writer.Allocating = .fromArrayList(self.allocator, &body_list);
+        // Allocating owns the buffer; fromArrayList would empty a source list and
+        // leave us reading an empty ArrayList after fetch.
+        var body_aw: Io.Writer.Allocating = .init(self.allocator);
         defer body_aw.deinit();
 
         const result = client.fetch(.{
@@ -159,7 +159,7 @@ pub const Client = struct {
             };
         };
 
-        const owned = try body_list.toOwnedSlice(self.allocator);
+        const owned = try body_aw.toOwnedSlice();
         return .{
             .status = @intFromEnum(result.status),
             .body = owned,
