@@ -90,10 +90,11 @@ pub fn exchangeCode(
     const body = try std.json.Stringify.valueAlloc(allocator, body_obj, .{});
     defer allocator.free(body);
 
+    // 3LO: client_id/secret in JSON body only (no Authorization header).
     var result = try client.request(.{
         .method = .POST,
         .url = "https://auth.atlassian.com/oauth/token",
-        .auth_header = "Basic ignored",
+        .auth_header = null,
         .body = body,
     });
     defer result.deinit(allocator);
@@ -121,7 +122,7 @@ pub fn refresh(
     var result = try client.request(.{
         .method = .POST,
         .url = "https://auth.atlassian.com/oauth/token",
-        .auth_header = "Basic ignored",
+        .auth_header = null,
         .body = body,
     });
     defer result.deinit(allocator);
