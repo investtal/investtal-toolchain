@@ -162,5 +162,25 @@ _tag="atlassian-v${_new}"
 # We only assert the naming contract used by orchestrator
 assert_eq "atlassian-v0.1.1" "$_tag" "target tag name from current+level"
 
+echo "== multi-commit rebase: tip-only range misses tools =="
+# Simulate PR with atlassian fix then a release-test-only tip (real PR #18 failure mode).
+# HEAD^ range → no tool; full PR range → atlassian.
+_paths_tip=$'scripts/release/tests/run.sh'
+_paths_pr=$'atlassian/src/http/client.zig\nscripts/release/tests/run.sh'
+got="$(printf '%s\n' "$_paths_tip" | "$ROOT/detect-changed-tools.sh" | tr '\n' ' ' | xargs)"
+assert_eq "" "$got" "tip-only (HEAD^) misses atlassian"
+got="$(printf '%s\n' "$_paths_pr" | "$ROOT/detect-changed-tools.sh" | tr '\n' ' ' | xargs)"
+assert_eq atlassian "$got" "full PR range detects atlassian"
+
+echo "== parse PR base.sha from commits/pulls JSON =="
+# Mirrors resolve_pr_base_sha python/gh path (structure only)
+_json='[{"base":{"sha":"abc123def4567890abc123def4567890abc123de","ref":"main"},"title":"fix: x"}]'
+_base="$(printf '%s' "$_json" | python3 -c '
+import sys, json
+a = json.load(sys.stdin)
+print((a[0].get("base") or {}).get("sha") or "")
+')"
+assert_eq "abc123def4567890abc123def4567890abc123de" "$_base" "PR base.sha from JSON"
+
 echo "passed=$pass failed=$fail"
 [[ "$fail" -eq 0 ]]

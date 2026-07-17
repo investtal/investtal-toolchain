@@ -150,13 +150,101 @@ except Exception:
   return 1
 }
 
-# Resolve BASE_SHA from env or git parents (shallow-clone aware).
+# Resolve associated PR base.sha for a commit (empty if none / unresolvable).
+# Multi-commit rebase/squash merges onto main make HEAD^ see only the last commit;
+# PR base covers the full PR range so path-based tool detection works.
+resolve_pr_base_sha() {
+  local sha="$1" repo="$2" token="$3"
+  local base="" pulls=""
+
+  if command -v gh >/dev/null 2>&1; then
+    base="$(gh api "repos/${repo}/commits/${sha}/pulls" \
+      --jq '.[0].base.sha // empty' 2>/dev/null || true)"
+    if [[ -n "$base" ]]; then
+      printf '%s\n' "$base"
+      return 0
+    fi
+  fi
+
+  if [[ -z "$token" ]]; then
+    return 0
+  fi
+
+  pulls="$(curl -fsSL \
+    -H "Authorization: Bearer $token" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${repo}/commits/${sha}/pulls" 2>/dev/null || echo '')"
+  [[ -n "$pulls" && "$pulls" != "[]" ]] || return 0
+
+  if command -v python3 >/dev/null 2>&1; then
+    base="$(printf '%s' "$pulls" | python3 -c '
+import sys, json
+try:
+    a = json.load(sys.stdin)
+    if isinstance(a, list) and a:
+        b = (a[0].get("base") or {}).get("sha") or ""
+        print(b)
+except Exception:
+    pass
+' 2>/dev/null || true)"
+    if [[ -n "$base" ]]; then
+      printf '%s\n' "$base"
+      return 0
+    fi
+  fi
+
+  # sed best-effort: first "sha" under base object is fragile; look for base.sha path
+  base="$(printf '%s' "$pulls" \
+    | tr '\n' ' ' \
+    | sed -E 's/.*"base"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{7,40})".*/\1/' \
+    || true)"
+  if [[ "$base" =~ ^[0-9a-f]{7,40}$ ]]; then
+    printf '%s\n' "$base"
+  fi
+}
+
+# Resolve BASE_SHA for change detection.
+# Order:
+#   1) explicit BASE_SHA env (tests / ops override)
+#   2) merge commit → first parent
+#   3) associated PR base.sha (multi-commit rebase/squash onto main)
+#   4) HEAD^ / HEAD~1
 resolve_base_sha() {
-  local sha=""
+  local sha="" head_sha repo token pr_base
   if [[ -n "${BASE_SHA:-}" ]]; then
     printf '%s\n' "$BASE_SHA"
     return 0
   fi
+
+  # True merge commit (2 parents): range is first-parent → HEAD
+  if git rev-parse -q --verify HEAD^2 >/dev/null; then
+    git rev-parse HEAD^1
+    return 0
+  fi
+
+  head_sha="$(git rev-parse HEAD)"
+  repo="${GITHUB_REPOSITORY:-investtal/investtal-toolchain}"
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  pr_base="$(resolve_pr_base_sha "$head_sha" "$repo" "$token" || true)"
+  if [[ -n "$pr_base" ]]; then
+    # Ensure object exists (shallow agents may need a deepen/fetch)
+    if ! git rev-parse -q --verify "${pr_base}^{commit}" >/dev/null 2>&1; then
+      git fetch --depth=1 origin "$pr_base" 2>/dev/null || true
+      git fetch --deepen=50 2>/dev/null || true
+    fi
+    if git rev-parse -q --verify "${pr_base}^{commit}" >/dev/null 2>&1; then
+      # Refuse if pr_base is not an ancestor of HEAD (stale/wrong association)
+      if git merge-base --is-ancestor "$pr_base" HEAD 2>/dev/null; then
+        echo "release: BASE_SHA from associated PR base ($pr_base)" >&2
+        printf '%s\n' "$pr_base"
+        return 0
+      fi
+      echo "release: ignoring PR base $pr_base (not ancestor of HEAD)" >&2
+    else
+      echo "release: PR base $pr_base not in local history; falling back to HEAD^" >&2
+    fi
+  fi
+
   if sha="$(git rev-parse HEAD^ 2>/dev/null)"; then
     printf '%s\n' "$sha"
     return 0
