@@ -24,11 +24,31 @@ case "$VERSION" in
   *) die "VERSION must be bare semver (got: $VERSION)" ;;
 esac
 
-# Windows targets need zip; fail early with a clear message.
-command -v zip >/dev/null 2>&1 \
-  || die "zip not found (required for Windows atlassian packages: atlassian_*_windows_*.zip)"
 command -v tar >/dev/null 2>&1 \
   || die "tar not found (required for linux/macos atlassian packages)"
+# Windows packages need zip CLI or python3 (zipfile). Prefer zip when present.
+if ! command -v zip >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+  die "need zip or python3 to create Windows atlassian packages (neither found on PATH)"
+fi
+
+# Write a zip containing a single file as its basename (cwd-relative).
+# Args: <output.zip> <file-in-cwd>
+make_zip() {
+  local out="$1" file="$2"
+  if command -v zip >/dev/null 2>&1; then
+    zip -q "$out" "$file"
+    return 0
+  fi
+  # Agent images often lack Info-ZIP; stdlib zipfile is enough.
+  python3 - "$out" "$file" <<'PY'
+import sys
+import zipfile
+
+out_path, name = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+    zf.write(name, arcname=name)
+PY
+}
 
 mkdir -p "$OUT_DIR"
 # Resolve absolute OUT_DIR so archives land correctly after cd
@@ -80,7 +100,7 @@ for row in "${MATRIX[@]}"; do
     # zip stores relative path from cwd
     (
       cd "$workdir/pkg"
-      zip -q "$OUT_DIR/${name}.zip" atlassian.exe
+      make_zip "$OUT_DIR/${name}.zip" atlassian.exe
     )
     rm -rf "$workdir/pkg"
   fi
