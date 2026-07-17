@@ -11,7 +11,7 @@ const cmd_platform = @import("cmd_platform.zig");
 const cmd_confluence = @import("cmd_confluence.zig");
 const cmd_api = @import("cmd_api.zig");
 
-pub const VERSION = "0.1.3";
+pub const VERSION = "0.2.0";
 
 const help_text =
     "atlassian — Investtal Atlassian CLI v" ++ VERSION ++ "\n\n" ++
