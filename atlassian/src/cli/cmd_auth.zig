@@ -32,18 +32,36 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         }
         const cloud = if (tokens) |t| (t.cloud_id orelse cfg.cloud_id orelse "") else (cfg.cloud_id orelse "");
         const exp: i64 = if (tokens) |t| t.expires_at_unix else 0;
-        const text = std.fmt.allocPrint(allocator, "mode={s}\nurl={s}\ncloud_id={s}\nexpires_at_unix={d}\n", .{
+        const scope = if (tokens) |t| (t.scope orelse "") else "";
+        const has_board = std.mem.indexOf(u8, scope, "read:board-scope:jira-software") != null;
+        const has_issue_details = std.mem.indexOf(u8, scope, "read:issue-details:jira") != null or std.mem.indexOf(u8, scope, "read:jira-work") != null;
+        const agile_ok = has_board; // board-scope is the hard requirement for /rest/agile
+        const text = std.fmt.allocPrint(allocator,
+            \\mode={s}
+            \\url={s}
+            \\cloud_id={s}
+            \\expires_at_unix={d}
+            \\scope={s}
+            \\agile_board_scope={s}
+            \\hint={s}
+            \\
+        , .{
             mode,
             cfg.url orelse "",
             cloud,
             exp,
+            if (scope.len > 0) scope else "(none stored — re-login)",
+            if (agile_ok) "ok" else "MISSING (board backlog/sprint need read:board-scope:jira-software)",
+            if (agile_ok) "Agile board/sprint APIs should work" else "Add Jira Software scopes on the OAuth app, then: atlassian auth login",
         }) catch return exit_codes.generic;
         defer allocator.free(text);
+        _ = has_issue_details;
         render.successText(ctx, text);
         return exit_codes.ok;
     }
 
     if (std.mem.eql(u8, verb, "login")) {
+        std.log.info("Requesting OAuth scopes:\n  {s}", .{auth_oauth.DEFAULT_SCOPES});
         var tokens = auth_login.interactiveLogin(allocator, io, cfg, auth_oauth.DEFAULT_SCOPES) catch |err| {
             const msg = std.fmt.allocPrint(allocator, "oauth login failed: {s}", .{@errorName(err)}) catch "oauth login failed";
             defer if (msg.ptr != "oauth login failed".ptr) allocator.free(msg);
@@ -56,7 +74,45 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         }
         config_mod.setKey(&cfg, allocator, "auth", "oauth") catch {};
         if (cfg.source_path) |p| config_mod.save(allocator, io, cfg, p) catch {};
-        render.successText(ctx, "login ok");
+
+        const granted = tokens.scope orelse "";
+        var miss_buf: [8][]const u8 = undefined;
+        const missing = auth_oauth.missingAgileScopes(granted, &miss_buf);
+        if (missing.len > 0) {
+            // Login succeeded for platform Jira, but Agile board/sprint will 401.
+            var msg: std.ArrayList(u8) = .empty;
+            defer msg.deinit(allocator);
+            msg.appendSlice(allocator, "login ok (platform Jira)\n") catch {};
+            msg.appendSlice(allocator, "WARNING: token is MISSING Jira Software scopes required for board/backlog/sprint:\n") catch {};
+            for (missing) |s| {
+                msg.print(allocator, "  - {s}\n", .{s}) catch {};
+            }
+            msg.appendSlice(allocator,
+                \\
+                \\Atlassian only grants scopes that are BOTH:
+                \\  (a) requested by the CLI (already done), AND
+                \\  (b) enabled on the OAuth app under Permissions → **Jira Software API**
+                \\      (this is separate from classic "Jira API" / read:jira-work)
+                \\
+                \\Fix:
+                \\  1) https://developer.atlassian.com/console/myapps/ → your app
+                \\  2) Permissions → add **Jira Software API** → enable:
+                \\       read:board-scope:jira-software
+                \\       read:sprint:jira-software
+                \\       read:issue-details:jira
+                \\       read:project:jira
+                \\  3) https://id.atlassian.com/manage-profile/apps → remove this app
+                \\  4) atlassian auth login again
+                \\  5) atlassian auth status  → agile_board_scope=ok
+                \\
+                \\Until then, use platform JQL (works with current token):
+                \\  atlassian --markdown jira board backlog --project IVT --assignee me
+                \\  atlassian --markdown jira issue search --assignee me --jql 'project = IVT'
+            ) catch {};
+            render.successText(ctx, msg.items);
+            return exit_codes.ok;
+        }
+        render.successText(ctx, "login ok (platform Jira + Agile board scopes)");
         return exit_codes.ok;
     }
 
