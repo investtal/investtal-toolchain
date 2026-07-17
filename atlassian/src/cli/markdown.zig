@@ -1,19 +1,12 @@
-//! Human-readable Markdown rendering for Atlassian API JSON bodies.
-//!
-//! Jira issue views are **dynamic + curated**:
-//! - Main fields only (preferred system fields + valued custom fields; noise dropped).
-//! - Labels from `names`; values from `schema` types (`expand=names,schema`).
-//! - Markdown tables are column-aligned for monospace terminals.
-//! - `curateAlloc` builds the same main-field JSON used by TOON/JSON modes.
+
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Value = std.json.Value;
 const EncodeError = Allocator.Error;
 
-/// Soft cap for table cell text (longer content becomes a ## section).
 const table_cell_max: usize = 120;
-/// Soft cap for long-text sections.
+
 const section_text_max: usize = 4000;
 
 pub fn encodeAlloc(allocator: Allocator, json_bytes: []const u8) ![]u8 {
@@ -40,8 +33,6 @@ pub fn encodeAlloc(allocator: Allocator, json_bytes: []const u8) ![]u8 {
     return try list.toOwnedSlice(allocator);
 }
 
-/// If body is a Jira issue or search result, return owned compact JSON of **main**
-/// fields (same set as Markdown). Otherwise return null (caller keeps full body).
 pub fn curateAlloc(allocator: Allocator, json_bytes: []const u8) !?[]u8 {
     const trimmed = std.mem.trim(u8, json_bytes, " \t\r\n");
     if (trimmed.len == 0) return null;
@@ -54,9 +45,6 @@ pub fn curateAlloc(allocator: Allocator, json_bytes: []const u8) !?[]u8 {
     return null;
 }
 
-// ─── Schema ──────────────────────────────────────────────────────────────────
-
-/// Slice of a Jira `schema` entry (borrowed from parsed JSON).
 const FieldSchema = struct {
     type: []const u8,
     items: ?[]const u8 = null,
@@ -80,7 +68,7 @@ const FieldSchema = struct {
         return fromValue(v);
     }
 
-    /// Last segment of custom key: `com.pyxis…:gh-sprint` → `gh-sprint`.
+
     fn customTail(self: FieldSchema) ?[]const u8 {
         const c = self.custom orelse return null;
         if (std.mem.lastIndexOfScalar(u8, c, ':')) |i| return c[i + 1 ..];
@@ -104,8 +92,6 @@ const FieldSchema = struct {
         return false;
     }
 };
-
-// ─── Jira issue (curated main fields + schema) ───────────────────────────────
 
 const FieldRow = struct {
     label: []u8,
@@ -243,7 +229,6 @@ fn curateIssueJson(allocator: Allocator, value: Value) EncodeError!?[]u8 {
     return try out.toOwnedSlice(allocator);
 }
 
-/// Column-aligned two-column markdown table (monospace-friendly).
 fn writeAlignedTwoColTable(
     allocator: Allocator,
     out: *std.ArrayList(u8),
@@ -257,7 +242,7 @@ fn writeAlignedTwoColTable(
         w0 = @max(w0, displayWidth(r.label));
         w1 = @max(w1, displayWidth(r.value));
     }
-    // Cap value column so terminal isn't huge
+
     if (w1 > 80) w1 = 80;
 
     try writeMdTableRow(allocator, out, header_a, header_b, w0, w1, false);
@@ -297,7 +282,7 @@ fn appendDashes(allocator: Allocator, out: *std.ArrayList(u8), n: usize) EncodeE
 }
 
 fn appendPaddedCell(allocator: Allocator, out: *std.ArrayList(u8), s: []const u8, width: usize, escape_pipes: bool) EncodeError!void {
-    // Flatten newlines/pipes for table cells; then pad to width.
+
     var flat: std.ArrayList(u8) = .empty;
     defer flat.deinit(allocator);
     for (s) |c| {
@@ -309,10 +294,10 @@ fn appendPaddedCell(allocator: Allocator, out: *std.ArrayList(u8), s: []const u8
             try flat.append(allocator, c);
         }
     }
-    // Truncate display if over width (byte-safe cut at width codepoints approx via bytes)
+
     var shown = flat.items;
     if (displayWidth(shown) > width) {
-        // keep prefix that fits
+
         var acc: usize = 0;
         var i: usize = 0;
         while (i < shown.len) {
@@ -355,11 +340,10 @@ fn appendJsonString(allocator: Allocator, out: *std.ArrayList(u8), s: []const u8
     try out.append(allocator, '"');
 }
 
-/// Main-field gate: preferred system fields + valued custom fields; drop Jira noise.
 fn isMainField(field_id: []const u8, schema: ?FieldSchema) bool {
-    // Custom fields always eligible (sprint, story points, flags, …)
+
     if (std.mem.startsWith(u8, field_id, "customfield_")) {
-        // Internal rank is not human-main
+
         if (schema) |s| {
             if (s.customTail()) |tail| {
                 if (std.mem.eql(u8, tail, "gh-lexo-rank")) return false;
@@ -368,7 +352,7 @@ fn isMainField(field_id: []const u8, schema: ?FieldSchema) bool {
         return true;
     }
 
-    // Explicit main system fields
+
     for (preferred_order) |id| {
         if (std.mem.eql(u8, field_id, id)) return true;
     }
@@ -390,7 +374,7 @@ fn isMainField(field_id: []const u8, schema: ?FieldSchema) bool {
         std.mem.eql(u8, field_id, "issuelinks"))
         return true;
 
-    // Everything else (votes, watches, lastViewed, progress, statusCategory, …) dropped
+
     return false;
 }
 
@@ -456,28 +440,25 @@ fn sortFieldRows(rows: *std.ArrayList(FieldRow)) EncodeError!void {
     }
 }
 
-// ─── Schema-aware value formatting ───────────────────────────────────────────
-
 const SchemaFormat = struct {
-    /// true when this schema type was recognized (null text = intentionally skip).
+
     handled: bool,
     text: ?[]u8 = null,
 };
 
-/// Returns owned display string, or null to skip (null / empty / noise).
 fn formatFieldValue(allocator: Allocator, value: Value, schema: ?FieldSchema) EncodeError!?[]u8 {
     if (value == .null) return null;
 
     if (schema) |s| {
         const r = try formatBySchema(allocator, value, s);
         if (r.handled) return r.text;
-        // Unknown schema type → shape heuristics.
+
     }
     return try formatByShape(allocator, value);
 }
 
 fn formatBySchema(allocator: Allocator, value: Value, schema: FieldSchema) EncodeError!SchemaFormat {
-    // Custom plugins first (more specific than base type).
+
     if (schema.customTail()) |tail| {
         const custom = try formatByCustom(allocator, value, tail, schema);
         if (custom.handled) return custom;
@@ -544,7 +525,7 @@ fn formatBySchema(allocator: Allocator, value: Value, schema: FieldSchema) Encod
 }
 
 fn formatByCustom(allocator: Allocator, value: Value, tail: []const u8, schema: FieldSchema) EncodeError!SchemaFormat {
-    // Sprint (GreenHopper): array of { id, name, state, boardId }
+
     if (std.mem.eql(u8, tail, "gh-sprint")) {
         if (value == .array) {
             return .{ .handled = true, .text = try formatSchemaArray(allocator, value, "json") };
@@ -573,7 +554,7 @@ fn formatByCustom(allocator: Allocator, value: Value, tail: []const u8, schema: 
 }
 
 fn formatSchemaArray(allocator: Allocator, value: Value, items: ?[]const u8) EncodeError!?[]u8 {
-    // Worklog/comment APIs sometimes wrap arrays in page objects despite schema type=array.
+
     if (value == .object) {
         if (value.object.get("worklogs")) |w| {
             if (w == .array) return try formatSchemaArray(allocator, w, items orelse "worklog");
@@ -581,7 +562,7 @@ fn formatSchemaArray(allocator: Allocator, value: Value, items: ?[]const u8) Enc
         if (value.object.get("comments")) |c| {
             if (c == .array) return try formatSchemaArray(allocator, c, items orelse "comment");
         }
-        // empty page
+
         if (value.object.get("total")) |t| {
             if (t == .integer and t.integer == 0) return null;
         }
@@ -695,7 +676,7 @@ fn formatStringish(allocator: Allocator, value: Value) EncodeError!?[]u8 {
             return try allocator.dupe(u8, s);
         },
         .object => {
-            // Cloud description is often ADF even when schema type is "string".
+
             return try formatAdfOrNull(allocator, value.object);
         },
         .integer => |n| return try std.fmt.allocPrint(allocator, "{d}", .{n}),
@@ -707,7 +688,7 @@ fn formatStringish(allocator: Allocator, value: Value) EncodeError!?[]u8 {
 }
 
 fn formatNumber(allocator: Allocator, value: Value, schema: FieldSchema) EncodeError!?[]u8 {
-    // workratio uses -1 as “unset”
+
     if (schema.system) |sys| {
         if (std.mem.eql(u8, sys, "workratio")) {
             if (value == .integer and value.integer < 0) return null;
@@ -866,7 +847,7 @@ fn formatIssueLink(allocator: Allocator, value: Value) EncodeError!?[]u8 {
 }
 
 fn formatIssueRestriction(allocator: Allocator, value: Value) EncodeError!?[]u8 {
-    // Usually { issuerestrictions: {}, shouldDisplay: bool } — skip empty noise.
+
     if (value != .object) return null;
     if (value.object.get("issuerestrictions")) |r| {
         if (r == .object and r.object.count() > 0) {
@@ -899,8 +880,6 @@ fn formatAdfOrNull(allocator: Allocator, obj: std.json.ObjectMap) EncodeError!?[
     }
     return null;
 }
-
-// ─── Shape fallback (no schema) ──────────────────────────────────────────────
 
 fn formatByShape(allocator: Allocator, value: Value) EncodeError!?[]u8 {
     switch (value) {
@@ -1005,8 +984,6 @@ fn compactObject(allocator: Allocator, obj: std.json.ObjectMap) EncodeError!?[]u
     return try out.toOwnedSlice(allocator);
 }
 
-// ─── Jira search ─────────────────────────────────────────────────────────────
-
 const search_cols = [_][]const u8{ "key", "summary", "status", "assignee", "priority", "issuetype", "updated", "duedate" };
 
 fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Value) EncodeError!bool {
@@ -1027,7 +1004,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
     }
     try out.appendSlice(allocator, ")\n\n");
 
-    // Fixed main columns that appear on at least one issue (aligned).
+
     var col_ids: std.ArrayList([]const u8) = .empty;
     defer col_ids.deinit(allocator);
     try col_ids.append(allocator, "key");
@@ -1035,7 +1012,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
         if (anyIssueHasField(issues, cid)) try col_ids.append(allocator, cid);
     }
 
-    // Materialize cell strings for width calculation
+
     var cell_grid: std.ArrayList([]u8) = .empty;
     defer {
         for (cell_grid.items) |c| allocator.free(c);
@@ -1067,7 +1044,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
         }
     }
 
-    // Header
+
     try out.appendSlice(allocator, "|");
     for (col_ids.items, 0..) |cid, c| {
         try out.append(allocator, ' ');
@@ -1075,7 +1052,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
         try out.appendSlice(allocator, " |");
     }
     try out.append(allocator, '\n');
-    // Separator
+
     try out.appendSlice(allocator, "|");
     for (widths) |w| {
         try out.append(allocator, ' ');
@@ -1083,7 +1060,7 @@ fn tryRenderJiraSearch(allocator: Allocator, out: *std.ArrayList(u8), value: Val
         try out.appendSlice(allocator, " |");
     }
     try out.append(allocator, '\n');
-    // Body
+
     r = 0;
     while (r < nrows) : (r += 1) {
         try out.appendSlice(allocator, "|");
@@ -1183,8 +1160,6 @@ fn prettyColHeader(field_id: []const u8) []const u8 {
     if (std.mem.eql(u8, field_id, "duedate")) return "Due";
     return field_id;
 }
-
-// ─── Generic fallback ────────────────────────────────────────────────────────
 
 fn renderGeneric(allocator: Allocator, out: *std.ArrayList(u8), value: Value, depth: usize) EncodeError!void {
     switch (value) {
@@ -1322,8 +1297,6 @@ fn extractText(allocator: Allocator, out: *std.ArrayList(u8), value: Value) Enco
     }
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
 test "markdown uses schema types for formatting" {
     const a = std.testing.allocator;
     const body =
@@ -1385,12 +1358,12 @@ test "markdown uses schema types for formatting" {
     try std.testing.expect(std.mem.indexOf(u8, out, "web, layout") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "Flags") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "Impediment") != null);
-    // noise dropped from main view
+
     try std.testing.expect(std.mem.indexOf(u8, out, "Votes") == null);
     try std.testing.expect(std.mem.indexOf(u8, out, "Work Ratio") == null);
     try std.testing.expect(std.mem.indexOf(u8, out, "## Description") != null);
     try std.testing.expect(std.mem.indexOf(u8, out, "Hello world") != null);
-    // aligned header separator present
+
     try std.testing.expect(std.mem.indexOf(u8, out, "| Field") != null);
 }
 

@@ -106,7 +106,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             return util.handleResult(ctx, allocator, &result);
         }
         if (std.mem.eql(u8, verb, "backlog")) {
-            // Preferred: Agile board backlog. Fallback: platform JQL (needs --project) when OAuth lacks Software scopes.
+
             const board_id = util.flagValue(rest, "--board") orelse positionalOrNull(rest);
             const project = util.flagValue(rest, "--project");
             const max: u32 = parseMax(rest, 50);
@@ -117,7 +117,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
                 return render.fail(ctx, exit_codes.usage, "usage: atlassian jira board backlog --board ID | --project KEY [--assignee me|USER] [--jql '…'] [--max N]");
             }
 
-            // JQL-only path (no Agile scopes needed)
+
             if (board_id == null) {
                 const jql = buildBacklogJql(allocator, project.?, extra, assignee) catch |err| {
                     return switch (err) {
@@ -141,7 +141,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             switch (result) {
                 .err => |e| {
                     if (e.status == 401) {
-                        // Auto-fallback when --project is provided
+
                         if (project) |pk| {
                             result.deinit(allocator);
                             const fb = buildBacklogJql(allocator, pk, extra, assignee) catch return render.fail(ctx, exit_codes.generic, "failed to build jql");
@@ -214,8 +214,8 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             return util.handleResult(ctx, allocator, &result);
         }
         if (std.mem.eql(u8, verb, "current")) {
-            // With --board: Agile active sprint → sprint issues.
-            // Without --board: JQL `sprint in openSprints()` (works with platform scopes only).
+
+
             const max: u32 = parseMax(rest, 50);
             const extra = util.flagValue(rest, "--jql");
             const assignee = util.flagValue(rest, "--assignee");
@@ -233,7 +233,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
                 const list_body = switch (list_result) {
                     .ok => |r| r.body,
                     .err => |e| {
-                        // Common OAuth gap: Agile scopes missing — fall back to openSprints JQL.
+
                         if (e.status == 401) {
                             const open_jql = buildOpenSprintsJql(allocator, extra, assignee) catch return render.fail(ctx, exit_codes.generic, "failed to build jql");
                             defer allocator.free(open_jql);
@@ -279,13 +279,12 @@ fn parseMax(rest: []const []const u8, default: u32) u32 {
     return default;
 }
 
-/// First non-flag positional arg (not starting with `-`).
 fn positionalOrNull(rest: []const []const u8) ?[]const u8 {
     var i: usize = 0;
     while (i < rest.len) : (i += 1) {
         const a = rest[i];
         if (std.mem.startsWith(u8, a, "-")) {
-            // skip flag + value when the flag takes an argument
+
             if (std.mem.eql(u8, a, "--board") or std.mem.eql(u8, a, "--sprint") or std.mem.eql(u8, a, "--assignee") or
                 std.mem.eql(u8, a, "--jql") or std.mem.eql(u8, a, "--max") or std.mem.eql(u8, a, "--state") or
                 std.mem.eql(u8, a, "--body") or std.mem.eql(u8, a, "--project") or
@@ -320,8 +319,6 @@ fn buildOpenSprintsJql(allocator: std.mem.Allocator, base_jql: ?[]const u8, assi
     return try allocator.dupe(u8, "sprint in openSprints()");
 }
 
-/// Approximate board backlog via platform JQL (no Agile scopes).
-/// Matches Scrum backlog idea: not Done, and not in an active/future sprint.
 fn buildBacklogJql(allocator: std.mem.Allocator, project: []const u8, base_jql: ?[]const u8, assignee: ?[]const u8) ![]u8 {
     const core = try std.fmt.allocPrint(
         allocator,

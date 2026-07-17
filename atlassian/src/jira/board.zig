@@ -18,7 +18,6 @@ pub fn get(client: *http_client.Client, allocator: Allocator, site: transport.Si
     return client.request(.{ .method = .GET, .url = url, .auth_header = auth });
 }
 
-/// Board backlog issues (Agile). Optional JQL (e.g. assignee filter) and maxResults.
 pub fn backlog(
     client: *http_client.Client,
     allocator: Allocator,
@@ -54,7 +53,7 @@ fn buildIssueListPath(
             try buf.print(allocator, "&jql={s}", .{enc});
         }
     }
-    // Prefer lean issue payload for list views (key fields + names when available).
+
     try buf.appendSlice(allocator, "&fields=summary,status,assignee,priority,issuetype,updated,duedate,created,project,labels,description");
     return try buf.toOwnedSlice(allocator);
 }

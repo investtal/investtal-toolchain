@@ -35,7 +35,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         const scope = if (tokens) |t| (t.scope orelse "") else "";
         const has_board = std.mem.indexOf(u8, scope, "read:board-scope:jira-software") != null;
         const has_issue_details = std.mem.indexOf(u8, scope, "read:issue-details:jira") != null or std.mem.indexOf(u8, scope, "read:jira-work") != null;
-        const agile_ok = has_board; // board-scope is the hard requirement for /rest/agile
+        const agile_ok = has_board;
         const text = std.fmt.allocPrint(allocator,
             \\mode={s}
             \\url={s}
@@ -79,7 +79,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         var miss_buf: [8][]const u8 = undefined;
         const missing = auth_oauth.missingAgileScopes(granted, &miss_buf);
         if (missing.len > 0) {
-            // Login succeeded for platform Jira, but Agile board/sprint will 401.
+
             var msg: std.ArrayList(u8) = .empty;
             defer msg.deinit(allocator);
             msg.appendSlice(allocator, "login ok (platform Jira)\n") catch {};

@@ -3,14 +3,14 @@ const Allocator = std.mem.Allocator;
 const OutputFormat = @import("output_format.zig").OutputFormat;
 
 pub const Global = struct {
-    /// Success body format. Default: toon.
+
     format: OutputFormat = .toon,
     config_path: ?[]const u8 = null,
     verbose: bool = false,
     rest: []const []const u8 = &.{},
     rest_owned: ?[][]const u8 = null,
 
-    /// Back-compat helper for call sites that only care about JSON error shape.
+
     pub fn json(self: Global) bool {
         return self.format.isJson();
     }
@@ -32,7 +32,7 @@ pub fn parse(allocator: Allocator, args: []const []const u8) !Global {
 
     if (args.len == 0) return g;
 
-    var i: usize = 1; // skip argv0
+    var i: usize = 1;
     var rest_list: std.ArrayList([]const u8) = .empty;
     defer rest_list.deinit(allocator);
     errdefer {
@@ -126,7 +126,7 @@ test "parse --markdown and --format" {
         try std.testing.expect(g.format == .json);
     }
     {
-        // last flag wins
+
         const args = [_][]const u8{ "atlassian", "--json", "--toon", "jira", "issue", "get", "X-1" };
         var g = try parse(a, args[0..]);
         defer g.deinit(a);

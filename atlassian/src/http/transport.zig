@@ -64,7 +64,7 @@ fn resolveCloudOAuth(allocator: Allocator, base: []const u8, cloud_id: ?[]const 
             return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/api/3/{s}", .{ cid, path });
         },
         .jira_software => {
-            // Same cloud gateway as Jira REST; Agile lives under /rest/agile/1.0.
+
             const cid = cloud_id orelse return error.MissingCloudId;
             if (path.len == 0)
                 return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/agile/1.0", .{cid});

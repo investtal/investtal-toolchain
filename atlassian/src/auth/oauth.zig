@@ -5,15 +5,7 @@ const http_client = @import("../http/client.zig");
 const store = @import("store.zig");
 
 pub const DEFAULT_CALLBACK_PORT: u16 = 8787;
-// Classic Jira platform (issue search/get) + granular Jira Software (Agile boards).
-// Jira Software does NOT accept classic scopes for /rest/agile — board APIs need
-// read:board-scope:jira-software (see developer.atlassian.com/cloud/jira/software/...).
-//
-// After changing this list you MUST:
-//   1) developer console → app → Permissions → enable **Jira Software API** (not only Jira API)
-//      and tick the granular scopes below
-//   2) Revoke the app at https://id.atlassian.com/manage-profile/apps (optional but reliable)
-//   3) `atlassian auth login` again (refresh does NOT add scopes)
+
 pub const DEFAULT_SCOPES: []const u8 =
     "read:jira-work write:jira-work read:jira-user offline_access " ++
     "read:board-scope:jira-software read:sprint:jira-software " ++

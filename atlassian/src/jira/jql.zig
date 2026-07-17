@@ -1,12 +1,8 @@
-//! Small JQL helpers for assignee filters and query composition.
+
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-/// Build an assignee clause from CLI shorthand.
-/// - `me` / `currentUser` → `assignee = currentUser()`
-/// - `unassigned` / `none` / `empty` → `assignee is EMPTY`
-/// - otherwise → `assignee = "<value>"` (accountId, email, or display name)
 pub fn assigneeClause(allocator: Allocator, assignee: []const u8) ![]u8 {
     const a = std.mem.trim(u8, assignee, " \t");
     if (a.len == 0) return error.EmptyAssignee;
@@ -16,7 +12,7 @@ pub fn assigneeClause(allocator: Allocator, assignee: []const u8) ![]u8 {
     if (std.ascii.eqlIgnoreCase(a, "unassigned") or std.ascii.eqlIgnoreCase(a, "none") or std.ascii.eqlIgnoreCase(a, "empty")) {
         return try allocator.dupe(u8, "assignee is EMPTY");
     }
-    // Escape quotes inside user token for JQL string literal.
+
     var list: std.ArrayList(u8) = .empty;
     errdefer list.deinit(allocator);
     try list.appendSlice(allocator, "assignee = \"");
@@ -28,8 +24,6 @@ pub fn assigneeClause(allocator: Allocator, assignee: []const u8) ![]u8 {
     return try list.toOwnedSlice(allocator);
 }
 
-/// Combine optional JQL parts with AND. Either/both may be null.
-/// Returns null if both empty. Caller owns result when non-null.
 pub fn andClauses(allocator: Allocator, a: ?[]const u8, b: ?[]const u8) !?[]u8 {
     const aa = if (a) |x| std.mem.trim(u8, x, " \t") else "";
     const bb = if (b) |x| std.mem.trim(u8, x, " \t") else "";
@@ -39,7 +33,6 @@ pub fn andClauses(allocator: Allocator, a: ?[]const u8, b: ?[]const u8) !?[]u8 {
     return try std.fmt.allocPrint(allocator, "({s}) AND ({s})", .{ aa, bb });
 }
 
-/// Percent-encode for use as a query parameter value (application/x-www-form-urlencoded-ish).
 pub fn urlEncode(allocator: Allocator, s: []const u8) ![]u8 {
     var list: std.ArrayList(u8) = .empty;
     errdefer list.deinit(allocator);
