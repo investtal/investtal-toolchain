@@ -18,7 +18,11 @@ pub const REQUIRED_AGILE_SCOPES = [_][]const u8{
 };
 
 pub fn scopeContains(scope_list: []const u8, needle: []const u8) bool {
-    return std.mem.indexOf(u8, scope_list, needle) != null;
+    var it = std.mem.splitScalar(u8, scope_list, ' ');
+    while (it.next()) |s| {
+        if (std.mem.eql(u8, s, needle)) return true;
+    }
+    return false;
 }
 
 pub fn missingAgileScopes(scope_list: []const u8, buf: [][]const u8) []const []const u8 {

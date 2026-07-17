@@ -41,6 +41,7 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
                             var client: http_client.Client = .{ .allocator = allocator, .io = io, .retries = cfg.http_retries };
                             if (auth_oauth.refresh(&client, allocator, cid, sec, rt)) |new_t| {
                                 var nt = new_t;
+                                errdefer nt.deinit(allocator);
                                 if (t.cloud_id) |c| {
                                     nt.cloud_id = try allocator.dupe(u8, c);
                                 }
