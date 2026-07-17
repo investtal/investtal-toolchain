@@ -47,7 +47,7 @@ fn ensureParentDirs(io: Io, path: []const u8) !void {
     if (std.fs.path.dirname(path)) |parent| {
         var i: usize = if (std.fs.path.isAbsolute(parent)) 1 else 0;
         while (i <= parent.len) : (i += 1) {
-            if (i != parent.len and parent[i] != '/') continue;
+            if (i != parent.len and !std.fs.path.isSep(parent[i])) continue;
             if (i == 0) continue;
             const segment = parent[0..i];
             Io.Dir.cwd().createDir(io, segment, .default_dir) catch |err| switch (err) {
@@ -93,14 +93,19 @@ pub fn loadTokens(allocator: Allocator, io: Io) !?TokenSet {
     defer parsed.deinit();
 
     const v = parsed.value;
-    return TokenSet{
+    var tokens = TokenSet{
         .access_token = try allocator.dupe(u8, v.access_token),
-        .refresh_token = if (v.refresh_token) |r| try allocator.dupe(u8, r) else null,
+        .refresh_token = null,
         .expires_at_unix = v.expires_at_unix,
-        .scope = if (v.scope) |s| try allocator.dupe(u8, s) else null,
-        .cloud_id = if (v.cloud_id) |c| try allocator.dupe(u8, c) else null,
+        .scope = null,
+        .cloud_id = null,
         .owns = true,
     };
+    errdefer tokens.deinit(allocator);
+    if (v.refresh_token) |r| tokens.refresh_token = try allocator.dupe(u8, r);
+    if (v.scope) |s| tokens.scope = try allocator.dupe(u8, s);
+    if (v.cloud_id) |c| tokens.cloud_id = try allocator.dupe(u8, c);
+    return tokens;
 }
 
 pub fn clearTokens(allocator: Allocator, io: Io) !void {

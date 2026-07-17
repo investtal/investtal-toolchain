@@ -192,7 +192,7 @@ fn ensureParentDirs(io: Io, path: []const u8) !void {
 
     var i: usize = if (std.fs.path.isAbsolute(parent)) 1 else 0;
     while (i <= parent.len) : (i += 1) {
-        if (i != parent.len and parent[i] != '/') continue;
+        if (i != parent.len and !std.fs.path.isSep(parent[i])) continue;
         if (i == 0) continue;
         const segment = parent[0..i];
         Io.Dir.cwd().createDir(io, segment, .default_dir) catch |err| switch (err) {
@@ -235,6 +235,7 @@ pub fn save(allocator: Allocator, io: Io, cfg: Config, path: []const u8) !void {
 }
 
 pub fn setKey(cfg: *Config, allocator: Allocator, key: []const u8, value: []const u8) !void {
+    cfg.owns = true;
     const assign = struct {
         fn put(field: *?[]const u8, a: Allocator, v: []const u8) !void {
             if (field.*) |old| a.free(old);

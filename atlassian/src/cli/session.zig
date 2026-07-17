@@ -29,6 +29,7 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
     var cfg = try config_mod.load(allocator, io, global.config_path);
     errdefer cfg.deinit(allocator);
     var tokens = auth_store.loadTokens(allocator, io) catch null;
+    errdefer if (tokens) |*t| t.deinit(allocator);
 
     if (cfg.auth_mode == .oauth) {
         if (tokens) |*t| {
@@ -62,18 +63,11 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
         }
     }
     const auth_ctx = auth_mod.fromConfig(cfg, tokens);
-    const header = auth_ctx.authorizationHeader(allocator) catch {
-        if (tokens) |*t| t.deinit(allocator);
-        cfg.deinit(allocator);
-        return error.MissingCredentials;
-    };
-    const site = cfg.site() catch {
-        allocator.free(header);
-        if (tokens) |*t| t.deinit(allocator);
-        cfg.deinit(allocator);
-        return error.MissingUrl;
-    };
-    return .{
+    const header = auth_ctx.authorizationHeader(allocator) catch return error.MissingCredentials;
+    errdefer allocator.free(header);
+    const site = cfg.site() catch return error.MissingUrl;
+
+    const out: Session = .{
         .cfg = cfg,
         .site = site,
         .auth_header = header,
@@ -85,4 +79,7 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
         },
         .tokens = tokens,
     };
+    // Transfer ownership to Session; suppress errdefer free of tokens.
+    tokens = null;
+    return out;
 }

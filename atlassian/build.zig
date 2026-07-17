@@ -9,6 +9,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    // std.c.getenv (config/auth paths); explicit for portable Linux static-ish links.
+    if (target.result.os.tag != .freestanding) {
+        mod.link_libc = true;
+    }
 
     const exe = b.addExecutable(.{
         .name = "atlassian",
@@ -19,6 +23,7 @@ pub fn build(b: *std.Build) void {
             .imports = &.{
                 .{ .name = "atlassian", .module = mod },
             },
+            .link_libc = true,
         }),
     });
 
