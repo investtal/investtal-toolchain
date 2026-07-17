@@ -57,8 +57,8 @@ sync_cli_version_const() {
   cli_root="$(dirname "$zon_file")/src/cli/root.zig"
   [[ -f "$cli_root" ]] || return 0
   tmp="$(mktemp)"
-  # pub const VERSION = "0.1.0";
-  sed -E "s/^(pub const VERSION = \")[0-9]+\\.[0-9]+\\.[0-9]+(\";.*)/\\1${ver}\\2/" \
+  # pub const VERSION = "0.1.0"; tolerate whitespace / zig fmt variants
+  sed -E "s/^([[:space:]]*pub[[:space:]]+const[[:space:]]+VERSION[[:space:]]*=[[:space:]]*\")[0-9]+\\.[0-9]+\\.[0-9]+(\";.*)/\\1${ver}\\2/" \
     "$cli_root" >"$tmp"
   mv "$tmp" "$cli_root"
 }

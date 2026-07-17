@@ -49,7 +49,7 @@ MATRIX=(
 
 cd "$REPO_ROOT/atlassian"
 workdir="$(mktemp -d "${TMPDIR:-/tmp}/atlassian-pkg.XXXXXX")"
-trap 'rm -rf "$workdir"' EXIT
+trap '[[ -n "${workdir:-}" && -d "$workdir" ]] && rm -rf "$workdir"' EXIT
 
 for row in "${MATRIX[@]}"; do
   # Portable: no mapfile; IFS split

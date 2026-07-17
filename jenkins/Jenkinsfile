@@ -49,7 +49,8 @@ pipeline {
 
         stage('Atlassian unit + smoke') {
             steps {
-                sh '''
+                // Agent /bin/sh is often dash (no pipefail). Force bash.
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
                     # shellcheck source=/dev/null
                     source scripts/release/lib.sh
@@ -102,7 +103,7 @@ pipeline {
                     usernameVariable: 'GIT_USERNAME',
                     passwordVariable: 'GH_TOKEN'
                 )]) {
-                    sh '''
+                    sh '''#!/usr/bin/env bash
                         set -euo pipefail
                         export GITHUB_TOKEN="$GH_TOKEN"
                         export GH_TOKEN
