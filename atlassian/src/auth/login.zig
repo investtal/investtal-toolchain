@@ -26,11 +26,17 @@ pub fn interactiveLogin(allocator: Allocator, io: Io, cfg: config_mod.Config, sc
     const url = try oauth.authorizeUrl(allocator, client_id, redirect_uri, state, scopes);
     defer allocator.free(url);
 
+    // Listen before openBrowser so a fast consent redirect cannot race the bind.
+    const address = try Io.net.IpAddress.parseIp4("127.0.0.1", oauth.DEFAULT_CALLBACK_PORT);
+    var server = try address.listen(io, .{ .reuse_address = true });
+    defer server.deinit(io);
+
+    std.log.info("Listening on http://127.0.0.1:{d}/callback for OAuth redirect…", .{oauth.DEFAULT_CALLBACK_PORT});
     std.log.info("Opening browser for Atlassian OAuth…", .{});
     std.log.info("If it does not open, visit:\n  {s}", .{url});
     openBrowser(allocator, io, url) catch {};
 
-    const code = try waitForCallback(allocator, io, oauth.DEFAULT_CALLBACK_PORT, state);
+    const code = try waitForCallback(allocator, io, &server, state);
     defer allocator.free(code);
 
     var client: http_client.Client = .{
@@ -77,57 +83,103 @@ fn builtinOs() enum { macos, linux, windows, other } {
     };
 }
 
-fn waitForCallback(allocator: Allocator, io: Io, port: u16, expected_state: []const u8) ![]u8 {
-    const address = try Io.net.IpAddress.parseIp4("127.0.0.1", port);
-    var server = try address.listen(io, .{ .reuse_address = true });
-    defer server.deinit(io);
+// JWT auth codes + Chrome headers; headroom so headers usually fit one fillMore.
+const CALLBACK_READ_BUF: usize = 64 * 1024;
 
-    std.log.info("Listening on http://127.0.0.1:{d}/callback for OAuth redirect…", .{port});
+fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expected_state: []const u8) ![]u8 {
+    // Skip non-callback sockets (favicon/noise) until code+state arrive.
+    while (true) {
+        var stream = try server.accept(io);
+        const req = readHttpHeaders(allocator, io, &stream) catch |err| {
+            stream.close(io);
+            if (err == error.IncompleteRequest) continue;
+            return err;
+        };
+        defer allocator.free(req);
 
-    var stream = try server.accept(io);
-    defer stream.close(io);
+        const code = findQueryParam(req, "code") orelse {
+            stream.close(io);
+            continue;
+        };
+        const st = findQueryParam(req, "state") orelse {
+            stream.close(io);
+            continue;
+        };
+        if (!std.mem.eql(u8, st, expected_state)) {
+            stream.close(io);
+            return error.StateMismatch;
+        }
 
-    var rbuf: [4096]u8 = undefined;
-    var reader = stream.reader(io, &rbuf);
-    var req_buf: [4096]u8 = undefined;
-    var n: usize = 0;
-    while (n < req_buf.len) {
-        const got = reader.interface.readSliceShort(req_buf[n..]) catch break;
-        if (got == 0) break;
-        n += got;
-        if (std.mem.indexOf(u8, req_buf[0..n], "\r\n\r\n") != null) break;
+        const body =
+            \\<!doctype html><html><body>
+            \\<h1>Atlassian CLI</h1>
+            \\<p>Login successful. You can close this window.</p>
+            \\</body></html>
+        ;
+        const response = try std.fmt.allocPrint(
+            allocator,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n{s}",
+            .{ body.len, body },
+        );
+        defer allocator.free(response);
+
+        var wbuf: [1024]u8 = undefined;
+        var writer = stream.writer(io, &wbuf);
+        try writer.interface.writeAll(response);
+        try writer.interface.flush();
+        stream.close(io);
+
+        return try allocator.dupe(u8, code);
     }
-    const req = req_buf[0..n];
+}
 
-    const code = findQueryParam(req, "code") orelse return error.MissingCode;
-    const st = findQueryParam(req, "state") orelse return error.MissingState;
-    if (!std.mem.eql(u8, st, expected_state)) return error.StateMismatch;
+/// Read until CRLFCRLF. Uses `fillMore` (one OS read); `readSliceShort` waits for
+/// a full buffer and hung forever when Chrome sent headers then waited for a reply.
+fn readHttpHeaders(allocator: Allocator, io: Io, stream: *Io.net.Stream) ![]u8 {
+    var rbuf: [CALLBACK_READ_BUF]u8 = undefined;
+    var reader = stream.reader(io, &rbuf);
 
-    const response =
-        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nConnection: close\r\n\r\n" ++
-        "<html><body><h1>Atlassian CLI</h1><p>Login successful. You can close this window.</p></body></html>";
-    var wbuf: [64]u8 = undefined;
-    var writer = stream.writer(io, &wbuf);
-    try writer.interface.writeAll(response);
-    try writer.interface.flush();
-
-    return try allocator.dupe(u8, code);
+    while (true) {
+        const data = reader.interface.buffered();
+        if (std.mem.indexOf(u8, data, "\r\n\r\n")) |end| {
+            return try allocator.dupe(u8, data[0 .. end + 4]);
+        }
+        if (data.len >= rbuf.len) return error.RequestTooLarge;
+        reader.interface.fillMore() catch |err| switch (err) {
+            error.EndOfStream => return error.IncompleteRequest,
+            else => return err,
+        };
+    }
 }
 
 fn findQueryParam(req: []const u8, key: []const u8) ?[]const u8 {
     const q = std.mem.indexOfScalar(u8, req, '?') orelse return null;
-    var sp = std.mem.tokenizeAny(u8, req[q + 1 ..], "& ");
+    var query = req[q + 1 ..];
+    if (std.mem.indexOfAny(u8, query, " \r\n")) |end| query = query[0..end];
+
+    var sp = std.mem.splitScalar(u8, query, '&');
     while (sp.next()) |pair| {
-        if (pair.len == 0 or pair[0] == '\r' or pair[0] == '\n') break;
+        if (pair.len == 0) continue;
         const eq = std.mem.indexOfScalar(u8, pair, '=') orelse continue;
         if (std.mem.eql(u8, pair[0..eq], key)) {
-            var val = pair[eq + 1 ..];
-            if (std.mem.indexOfScalar(u8, val, ' ')) |s| val = val[0..s];
-            if (std.mem.indexOfScalar(u8, val, '\r')) |s| val = val[0..s];
-            return val;
+            return pair[eq + 1 ..];
         }
     }
     return null;
+}
+
+test "findQueryParam extracts long Atlassian JWT code" {
+    const code = "eyJraWQiOiJBVVRIX0NPREUifQ.eyJqdGkiOiIxIn0.sig";
+    const req = "GET /callback?state=abc123&code=" ++ code ++ " HTTP/1.1\r\nHost: 127.0.0.1:8787\r\n\r\n";
+    try std.testing.expectEqualStrings(code, findQueryParam(req, "code").?);
+    try std.testing.expectEqualStrings("abc123", findQueryParam(req, "state").?);
+    try std.testing.expect(findQueryParam(req, "missing") == null);
+}
+
+test "findQueryParam ignores trailing headers" {
+    const req = "GET /callback?code=c1&state=s1 HTTP/1.1\r\nHost: x\r\nCookie: a=b&c=d\r\n\r\n";
+    try std.testing.expectEqualStrings("c1", findQueryParam(req, "code").?);
+    try std.testing.expectEqualStrings("s1", findQueryParam(req, "state").?);
 }
 
 const AccessibleResource = struct {
