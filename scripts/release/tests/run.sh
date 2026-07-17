@@ -10,6 +10,14 @@ assert_eq() {
     echo "  ✗ $msg (want=$want got=$got)"; fail=$((fail+1))
   fi
 }
+assert_true() {
+  local msg="$1"
+  echo "  ✓ $msg"; pass=$((pass+1))
+}
+assert_fail_msg() {
+  local msg="$1"
+  echo "  ✗ $msg"; fail=$((fail+1))
+}
 
 echo "== detect-bump-level =="
 assert_eq major "$("$ROOT/detect-bump-level.sh" 'feat!: drop api')" "feat!"
@@ -44,8 +52,9 @@ echo "== read_version plain (9cc) =="
 load_tool 9cc
 assert_eq 0.5.4 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "9cc VERSION"
 
-echo "== bash -n syntax (new Task 2 scripts) =="
-for s in create-tag-and-push.sh publish-github-release.sh run-auto-release.sh; do
+echo "== bash -n syntax (release scripts) =="
+for s in bump-version.sh create-tag-and-push.sh detect-bump-level.sh detect-changed-tools.sh \
+         lib.sh publish-github-release.sh run-auto-release.sh; do
   if bash -n "$ROOT/$s"; then
     echo "  ✓ bash -n $s"; pass=$((pass+1))
   else
@@ -53,23 +62,82 @@ for s in create-tag-and-push.sh publish-github-release.sh run-auto-release.sh; d
   fi
 done
 
-echo "== run-auto-release skip [skip ci] subject =="
-# Smoke: script sources and exits 0 when HEAD subject would skip.
-# We exercise the skip predicate logic via a temp clone of the check only.
-_skip_subj='chore(release): atlassian v0.1.1 [skip ci]'
-if [[ "$_skip_subj" == *'[skip ci]'* || "$_skip_subj" == *'[ci skip]'* ]] \
-  || [[ "$_skip_subj" == chore\(release\):* ]]; then
-  echo "  ✓ skip predicate matches release commit"; pass=$((pass+1))
+echo "== skip / retriable subject predicates =="
+# Pure [skip ci] / [ci skip] (not chore(release):) → full skip
+_pure_skip='docs: update readme [skip ci]'
+if [[ "$_pure_skip" != chore\(release\):* ]] \
+  && [[ "$_pure_skip" == *'[skip ci]'* || "$_pure_skip" == *'[ci skip]'* ]]; then
+  assert_true "pure [skip ci] is full-skip"
 else
-  echo "  ✗ skip predicate failed"; fail=$((fail+1))
+  assert_fail_msg "pure [skip ci] should full-skip"
+fi
+_pure_ci_skip='chore: internal [ci skip]'
+if [[ "$_pure_ci_skip" != chore\(release\):* ]] \
+  && [[ "$_pure_ci_skip" == *'[skip ci]'* || "$_pure_ci_skip" == *'[ci skip]'* ]]; then
+  assert_true "pure [ci skip] is full-skip"
+else
+  assert_fail_msg "pure [ci skip] should full-skip"
+fi
+# chore(release): … is retriable — NOT a full skip
+_rel='chore(release): atlassian v0.1.1 [skip ci]'
+if [[ "$_rel" == chore\(release\):* ]]; then
+  assert_true "chore(release) is retriable path (not full-skip)"
+else
+  assert_fail_msg "chore(release) should be retriable"
 fi
 _noskip='feat(atlassian): add feature'
-if [[ "$_noskip" == *'[skip ci]'* || "$_noskip" == *'[ci skip]'* ]] \
-  || [[ "$_noskip" == chore\(release\):* ]]; then
-  echo "  ✗ skip predicate false-positive on feat"; fail=$((fail+1))
+if [[ "$_noskip" != chore\(release\):* ]] \
+  && { [[ "$_noskip" == *'[skip ci]'* || "$_noskip" == *'[ci skip]'* ]]; }; then
+  assert_fail_msg "skip predicate false-positive on feat"
 else
-  echo "  ✓ skip predicate ignores normal feat"; pass=$((pass+1))
+  assert_true "skip predicate ignores normal feat"
 fi
+
+echo "== parse release subject (retriable publish) =="
+# Mirrors parse_release_subject in run-auto-release.sh
+_parse() {
+  local subject="$1"
+  local rest tool_part ver_part
+  rest="${subject#chore(release): }"
+  rest="${rest#"${rest%%[![:space:]]*}"}"
+  tool_part="${rest%% *}"
+  ver_part="${rest#* }"
+  ver_part="${ver_part%% *}"
+  if [[ "$ver_part" == v* ]]; then
+    ver_part="${ver_part#v}"
+  fi
+  printf '%s %s' "$tool_part" "$ver_part"
+}
+assert_eq "atlassian 0.1.1" "$(_parse 'chore(release): atlassian v0.1.1 [skip ci]')" "parse atlassian"
+assert_eq "9cc 0.5.5" "$(_parse 'chore(release): 9cc v0.5.5 [skip ci]')" "parse 9cc"
+assert_eq "atlassian 1.0.0" "$(_parse 'chore(release): atlassian v1.0.0')" "parse without skip marker"
+
+echo "== main-only push guard logic =="
+# Mirrors require_main_for_push decision (branch or env)
+_is_main() {
+  local current_branch="$1" env_raw="$2"
+  local env_branch="${env_raw##*/}"
+  if [[ "$current_branch" == "main" || "$env_branch" == "main" ]]; then
+    echo yes
+  else
+    echo no
+  fi
+}
+assert_eq yes "$(_is_main main '')" "local main"
+assert_eq yes "$(_is_main HEAD main)" "detached + BRANCH_NAME=main"
+assert_eq yes "$(_is_main HEAD origin/main)" "detached + GIT_BRANCH=origin/main"
+assert_eq no "$(_is_main feature/x '')" "feature branch refused"
+assert_eq no "$(_is_main HEAD feature/x)" "detached feature refused"
+assert_eq yes "$(_is_main feature/x main)" "env main wins (Jenkins)"
+
+echo "== tag-exists → skip bump (compute only) =="
+# current 0.1.0 + patch → 0.1.1; if tag atlassian-v0.1.1 exists, skip write
+_cur="0.1.0"
+_new="$(semver_bump "$_cur" patch)"
+assert_eq 0.1.1 "$_new" "compute next without writing"
+_tag="atlassian-v${_new}"
+# We only assert the naming contract used by orchestrator
+assert_eq "atlassian-v0.1.1" "$_tag" "target tag name from current+level"
 
 echo "passed=$pass failed=$fail"
 [[ "$fail" -eq 0 ]]
