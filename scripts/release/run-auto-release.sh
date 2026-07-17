@@ -179,7 +179,7 @@ except Exception:
 
   base="$(printf '%s' "$pulls" \
     | tr '\n' ' ' \
-    | sed -E 's/.*"base"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{7,40})".*/\1/' \
+    | sed -nE 's/.*"base"[[:space:]]*:[[:space:]]*\{[^}]*"sha"[[:space:]]*:[[:space:]]*"([0-9a-f]{7,40})".*/\1/p' \
     || true)"
   if [[ "$base" =~ ^[0-9a-f]{7,40}$ ]]; then
     printf '%s\n' "$base"
