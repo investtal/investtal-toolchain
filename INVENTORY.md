@@ -18,9 +18,10 @@ findings, and consumer instructions: [`docs/proto-plugins.md`](docs/proto-plugin
 | kubectl | `proto/kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` exists but proto TOML cannot wire it | 2026-06-23 |
 | vault | `proto/vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | 2026-06-23 |
 | netbird | `proto/netbird/plugin.toml` | TOML | n/a (vendored CLI plugin definition) | 2026-07-08 |
+| atlassian | `proto/atlassian/plugin.toml` | TOML | ✅ release checksums | 2026-07-17 |
 
 All verified end-to-end with `proto 0.56.4`: each TOML plugin resolves versions,
 downloads, and (where supported) verifies the binary checksum; the openjdk WASM
 plugin loads and lists Adoptium versions.
 
-| atlassian | `proto/atlassian/plugin.toml` | TOML | ✅ release checksums | 2026-07-17 |
+Docs: [`proto/README.md`](proto/README.md) · longer notes: [`docs/ideas/proto-plugins.md`](docs/ideas/proto-plugins.md).

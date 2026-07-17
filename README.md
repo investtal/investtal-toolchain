@@ -1,148 +1,68 @@
-# investtal-toolchain — proto plugins
+# investtal-toolchain
 
-Vendored, Investtal-owned [proto](https://moonrepo.dev/proto) toolchain plugins.
+**Investtal-owned developer tools, supply-chain pins, and shared automation.**
 
-This is the **single canonical source** for every Investtal proto plugin. It is a
-**public** repo so private consumers (`investtal-portals`, `devops-investtal`,
-`investtal-apis`, …) can pin plugins over plain `https://` instead of resolving
-them from uncontrolled third-party repos.
+This public monorepo is where we put the software engineers at Investtal actually run every day — CLIs we build, proto plugins we audit and vendor, git hooks that keep task IDs honest, and the CI that gates them. Private product repos (`investtal-portals`, `investtal-apis`, `devops-investtal`, …) **pin into this repo**; they do not pull toolchain definitions from random third-party GitHub accounts.
 
 ## Why this exists
 
-Our `.prototools` files previously resolved every non-builtin tool from an
-**uncontrolled third-party GitHub repo** (`ageha734`, `Phault`, `appthrust`,
-`jamesukiyo`, `eplightning`). proto loads a plugin's definition at install time,
-so whoever controls those repos controls what URL our CI/dev machines download a
-binary from. They can be force-pushed, deleted, transferred, or poisoned — and
-**proto has no checksum/lockfile for the plugin file itself**. That is a live
-supply-chain risk on a security-tooling install path.
+| Problem | What we do here |
+|---------|-----------------|
+| Toolchain plugins installed from **uncontrolled third-party** proto repos (force-push / takeovers = poisoned binaries) | Vendor and audit plugins under [`proto/`](proto/) and pin by **commit SHA** |
+| Agent + model routing needs a **fast, scriptable** launcher for Claude Code over our gateway | Ship [`9cc/`](9cc/) — model switcher + optional Docker sandbox |
+| Atlassian Cloud ops should be a **single binary**, not a pile of one-off curl scripts | Ship [`atlassian/`](atlassian/) — Zig CLI for Jira / Confluence / Goals / Teams |
+| Branches and commits without **IVT-XXXX** task IDs break tracking | Share [`git-hooks/`](git-hooks/) for every Landtal repo |
+| Toolchain changes need a real gate | [`jenkins/`](jenkins/) pipelines for the tools that need CI |
 
-This repo forks each plugin into infrastructure we own and have audited so the
-toolchain only ever resolves plugins we control. Vendoring + commit-SHA pinning
-**is** the integrity control for the plugin definition; the per-tool
-`checksum-url` (below) then verifies the downloaded binary.
+**Rule of thumb:** if it installs on a laptop or CI agent and it is not product source code, it belongs here — owned, versioned, and documented.
 
-## Inventory
+## Tools at a glance
 
-All plugins live under `proto/`. Per-tool shape, checksum status, and upstream
-provenance are tracked in [`INVENTORY.md`](INVENTORY.md); full integrity findings
-and per-tool notes are in [`docs/proto-plugins.md`](docs/proto-plugins.md).
+| Tool | What it is | Why we maintain it | Details |
+|------|------------|--------------------|---------|
+| **proto plugins** | Audited [proto](https://moonrepo.dev/proto) install definitions for gh, gitleaks, trivy, kubectl, openjdk, … | Single integrity surface; consumers pin raw URLs + commit SHA | [`proto/README.md`](proto/README.md) · [`INVENTORY.md`](INVENTORY.md) |
+| **atlassian** | Zig CLI for Atlassian Cloud (Jira, Confluence, Goals, Teams) | One binary for day-to-day ops + scripts; OAuth/Basic; release + proto install | [`atlassian/README.md`](atlassian/README.md) |
+| **9cc** | Claude Code model switcher over 9Router (+ Docker sandbox) | Agents and humans pick models without hand-editing Claude settings | [`9cc/README.md`](9cc/README.md) |
+| **git-hooks** | Native hooks: IVT branch policy + commit subject task-id suffix | Same branch/commit contract across the monorepo family | [`git-hooks/README.md`](git-hooks/README.md) |
+| **jenkins** | Jenkinsfiles for toolchain CI (e.g. 9cc tests/smoke) | Prove install/update paths before we trust them in production | [`jenkins/README.md`](jenkins/README.md) |
 
-| Tool | File | Kind | Binary checksum | Upstream forked from |
-|------|------|------|-----------------|----------------------|
-| gitleaks | `proto/gitleaks/plugin.toml` | TOML | ✅ `checksums.txt` | `Phault/proto-toml-plugins` |
-| migrate | `proto/migrate/plugin.toml` | TOML | ✅ `sha256sum.txt` | `jamesukiyo/proto-plugins` |
-| trivy | `proto/trivy/plugin.toml` | TOML | ✅ `checksums.txt` | `ageha734/proto-plugins` |
-| gh | `proto/gh/plugin.toml` | TOML | ✅ hardened (added `checksum-url`) | `appthrust/proto-toml-plugins` |
-| gradle | `proto/gradle/plugin.toml` | TOML | ✅ `.sha256` | `eplightning/openjdk-adoptium-proto-plugin` |
-| yq | `proto/yq/plugin.toml` | TOML | ❌ upstream ships no parseable checksum | `appthrust/proto-toml-plugins` |
-| openjdk | `proto/openjdk/openjdk_adoptium_tool.wasm` (+ `.sha256`) | WASM | vendored binary, hash pinned | `eplightning/openjdk-adoptium-proto-plugin` |
-| semgrep | `proto/semgrep/requirements.txt` | PyPI | ✅ `--require-hashes` | n/a (not a proto plugin) |
-| shfmt | `proto/shfmt/plugin.toml` | TOML | ❌ single-file binary, no checksum file | `ageha734/proto-plugins` |
-| shellcheck | `proto/shellcheck/plugin.toml` | TOML | ❌ no aggregate checksum file | `ageha734/proto-plugins` |
-| kubectl | `proto/kubectl/plugin.toml` | TOML | ❌ per-binary `.sha256` unwirable in TOML | `ageha734/proto-plugins` |
-| vault | `proto/vault/plugin.toml` | TOML | ✅ `SHA256SUMS` | hand-authored from `releases.hashicorp.com` |
-| netbird | `proto/netbird/plugin.toml` | TOML | n/a vendored CLI plugin definition | `netbirdio/netbird` |
+Deep design notes and implementation plans live under [`docs/`](docs/) (ideas, specs, plans). **How to install and use a tool is always in that tool’s `README.md`.**
 
-## Consuming the plugins
+## Layout
 
-proto locators ([docs](https://moonrepo.dev/docs/proto/non-wasm-plugin)) — always
-commit-SHA-pinned raw URLs against this public repo (immutable; a branch ref
-would let anyone with push access silently change the download):
+```text
+investtal-toolchain/
+├── proto/           # Vendored proto plugin definitions (per-tool dirs)
+├── atlassian/       # Atlassian Cloud CLI (Zig)
+├── 9cc/             # Claude Code model switcher + sandbox
+├── git-hooks/       # Shared Landtal git hooks
+├── jenkins/         # Toolchain CI
+├── docs/            # Specs, plans, longer write-ups
+├── INVENTORY.md     # Proto plugin audit table
+└── README.md        # This hub
+```
+
+## How consumers pin us
+
+**Proto plugins** — always commit-SHA-pinned (never a floating branch):
 
 ```toml
 [plugins.tools]
-gitleaks = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/gitleaks/plugin.toml"
-openjdk  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/openjdk/openjdk_adoptium_tool.wasm"
+gitleaks  = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/gitleaks/plugin.toml"
+atlassian = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/atlassian/plugin.toml"
 ```
 
-> Never reference the original third-party repos again. Never use an unpinned
-> `github://` or branch URL for these — that re-introduces the risk this repo
-> removes.
+**9cc / atlassian / hooks** — follow the install section in each tool README.
 
-## Updating a plugin
+Never re-point consumers at the original third-party proto plugin repos. That undoes the reason this repository exists.
 
-1. Diff the upstream plugin against ours; copy only intended changes.
-2. Confirm release asset + checksum filenames still match (GitHub API
-   `/releases/latest`).
-3. `proto install <tool>` in a scratch dir against a `file://` locator;
-   confirm the install log shows `Verifying checksum against …`.
-4. For openjdk: re-download the `.wasm`, recompute `.sha256`, confirm it equals
-   GitHub's server-side asset digest.
-5. For semgrep: bump version, re-resolve hashes from PyPI.
-6. Commit, then bump the pinned commit SHA in every consumer `.prototools`.
+## Contributing
 
-## 9cc — Claude Code model switcher
+1. Work on an `IVT-XXXX-…` branch (enforced by git-hooks).
+2. Put tool-specific docs in that tool’s `README.md`, not only in the root.
+3. For proto plugin changes: update inventory, verify checksum install, then bump SHAs in every consumer `.prototools`.
+4. For CLIs: keep offline tests green; release artifacts go through GitHub Releases with checksums where applicable.
 
-Launch Claude Code with a dynamic model over the 9Router gateway. Reads auth from
-`~/.claude/settings.json` (read-only — never mutates it).
+## License / ownership
 
-**Install (mac/linux/wsl):**
-```sh
-gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | bash
-```
-**Install (windows, PowerShell):**
-```powershell
-gh api repos/investtal/investtal-toolchain/contents/9cc/install.ps1 --jq '.content' | base64 -d | powershell -c -  
-```
-Pin a specific version or commit SHA via `CC9_VERSION` or by adding `?ref=<tag>` to the API path:
-```sh
-gh api "repos/investtal/investtal-toolchain/contents/9cc/install.sh?ref=v0.5.3" --jq '.content' | base64 -d | bash
-gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=v0.5.3 bash
-gh api repos/investtal/investtal-toolchain/contents/9cc/install.sh --jq '.content' | base64 -d | CC9_VERSION=<full-commit-sha> bash
-```
-Check installed version: `9cc version`.
-
-**Update:**
-```sh
-9cc update  # update to the latest release
-```
-
-**Use:**
-```sh
-9cc list                 # list models
-9cc list --json          # machine-readable registry (alias -> full id); consumed by fleet routing
-9cc update               # update 9cc to the latest release
-9cc uninstall            # remove 9cc (home directory and PATH copy/symlink)
-9cc run fable            # launch with cc/claude-fable-5
-9cc run glm/glm-5.2      # full 9Router ID also works
-9cc run minimax --resume # extra args forwarded to claude
-9cc next minimax         # print cascade successor for a model (fleet healer advances on rate-limit)
-9cc next minimax --no-free # successor excluding the free pool
-9cc sandbox build        # build the Docker image for sandbox mode
-9cc run fable --sandbox  # launch Claude Code inside a Docker sandbox (isolated home/SSH/AWS, logged egress)
-9cc version              # print version
-```
-In a live session, switch without restart: `/model <id>` (e.g. `/model glm/glm-5.2`).
-
-**Sandbox mode** (`9cc run <model> --sandbox`) runs Claude Code inside a Docker container. It:
-- mounts only the current project directory as the workspace;
-- hides `~`, `~/.ssh`, `~/.aws`, and the host shell environment;
-- copies `~/.claude` (minus `settings.json` and the host `local/` binary), `~/.investtal`, `~/.proto`, and `~/.prototools` into the image at build time;
-- mounts `~/.claude/settings.json` read-only for auth;
-- runs as the host uid:gid (bash/pwsh-on-WSL; native Windows uses container defaults);
-- refuses to run from `~` or `/`;
-- routes Claude's outbound API/tool traffic through an in-container agent-proxy that logs every request to Markdown in `~/.9cc/egress/`.
-
-**Claude install location (per machine):** sandbox no longer assumes `~/.claude/local`. Resolution order:
-1. `CC9_CLAUDE_LOCAL` — directory to copy as the image's `~/.claude/local`
-2. `CC9_CLAUDE_BIN` — single binary (staged as `local/bin/claude`)
-3. `~/.claude/local` — classic migrate-installer layout
-4. `claude` on `PATH` (e.g. `~/.local/bin/claude` → `~/.local/share/claude/versions/*`)
-5. If the host binary is not Linux-runnable (typical macOS Mach-O native install), the image **npm-installs** `@anthropic-ai/claude-code` instead so the Linux container still works
-
-Full design: [`docs/ideas/0002-ManageClaudeCodeCLI.spec.md`](docs/ideas/0002-ManageClaudeCodeCLI.spec.md).
-Implementation plan: [`docs/plans/2026-07-08-9cc-model-switcher.md`](docs/plans/2026-07-08-9cc-model-switcher.md).
-Overnight auto-pilot is deferred to a follow-up.
-
-## CI
-
-`9cc` is gated by a Jenkins pipeline ([`jenkins/Jenkinsfile`](jenkins/Jenkinsfile)) that runs:
-1. **Unit tests** (`9cc/9cc.test.sh`) — including a macOS-strict `base64` shim (Cycle 14c) so a Linux-only server still catches the line-wrapped-base64 regression that once broke `9cc update` on macOS.
-2. **Update smoke test** (`9cc/smoke.sh`) — hermetic end-to-end run of the install/decode/update path.
-3. **Real macOS** — auto-enables once a `macos`-labeled Jenkins agent exists; skipped today (Ubuntu-only fleet).
-
-Run both locally before pushing:
-```sh
-bash 9cc/9cc.test.sh && bash 9cc/smoke.sh
-```
+Owned by **Investtal**. Public so private repos can pin over plain HTTPS without cloning private toolchain definitions.
