@@ -1,30 +1,33 @@
-// CI for the 9cc CLI. Runs on the Ubuntu Jenkins server.
+// investtal-toolchain CI + multi-tool auto-release (main only).
+// GitHub Actions are not used. GitHub Releases = distribution only.
 //
-// Why this exists: a previous bug shipped `9cc update` broken because macOS
-// `base64 -d` rejects line-wrapped base64 while Linux tolerates it. A
-// Linux-only CI cannot catch that — so the unit stage runs the tests with a
-// shimmed `base64` that mimics macOS strictness (see Cycle 14c), AND a real
-// macOS node is attempted in the matrix stage.
+// Why 9cc unit runs macOS-strict decode on Linux: a previous bug shipped
+// `9cc update` broken because macOS `base64 -d` rejects line-wrapped base64
+// while Linux tolerates it. Unit tests shim base64 for macOS strictness
+// (Cycle 14c). A real macOS agent (label `macos`) is attempted in the matrix
+// stage when present.
 //
-// IVT-0610.
+// IVT-1707 / IVT-0610.
+
 pipeline {
     agent any
 
     options {
         timestamps()
-        timeout(time: 15, unit: 'MINUTES')
+        timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
 
     environment {
-        // Hermetic: unit tests + smoke must never depend on the host's ~/.9cc.
+        // Hermetic: 9cc unit tests + smoke must never depend on the host's ~/.9cc.
         CC9_HOME = "${env.WORKSPACE}/.ci-home"
         CC9_BIN_DIR = "${env.WORKSPACE}/.ci-bin"
+        // Skip local git hooks during release commits on the agent.
+        IVT_HOOK_SKIP = '1'
     }
 
     stages {
-
-        stage('Unit tests (Linux, macOS-strict decode)') {
+        stage('9cc unit + smoke') {
             steps {
                 sh '''
                     set -e
@@ -33,25 +36,38 @@ pipeline {
                     bash -n 9cc/9cc.sh
                     bash -n 9cc/smoke.sh
                     bash 9cc/9cc.test.sh
-                '''
-            }
-        }
-
-        stage('Smoke test (update path)') {
-            steps {
-                sh '''
-                    set -e
                     bash 9cc/smoke.sh
                 '''
             }
         }
 
-        stage('Matrix: real macOS') {
-            // The Jenkins fleet today is Ubuntu-only, so there is no `macos`
-            // agent to schedule on. This stage is defined so that as soon as a
-            // macOS agent (label `macos`) is added, real macOS coverage is
-            // automatic — no pipeline edit needed. Until then it is skipped
-            // rather than failing the build.
+        stage('Release scripts unit') {
+            steps {
+                sh 'bash scripts/release/tests/run.sh'
+            }
+        }
+
+        stage('Atlassian unit + smoke') {
+            steps {
+                sh '''
+                    set -euo pipefail
+                    # shellcheck source=/dev/null
+                    source scripts/release/lib.sh
+                    # shellcheck source=/dev/null
+                    source scripts/release/ensure-zig.sh
+                    ensure_zig
+                    (
+                      cd atlassian
+                      zig build test
+                      zig build
+                      ./scripts/smoke.sh ./zig-out/bin/atlassian
+                    )
+                '''
+            }
+        }
+
+        stage('Matrix: real macOS 9cc') {
+            // Fleet is Ubuntu-only today; stage no-ops until a `macos` agent exists.
             steps {
                 script {
                     def macAgent = nodesByLabel label: 'macos'
@@ -72,15 +88,47 @@ pipeline {
                 }
             }
         }
+
+        stage('Auto release (main)') {
+            when {
+                allOf {
+                    branch 'main'
+                    not { changeRequest() }
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-token-userpass',
+                    usernameVariable: 'GIT_USERNAME',
+                    passwordVariable: 'GH_TOKEN'
+                )]) {
+                    sh '''
+                        set -euo pipefail
+                        export GITHUB_TOKEN="$GH_TOKEN"
+                        export GH_TOKEN
+                        export GIT_USERNAME
+                        git fetch --tags --prune
+                        # BASE_SHA: first parent of merge commit when available
+                        if git rev-parse -q --verify HEAD^2 >/dev/null; then
+                          export BASE_SHA="$(git rev-parse HEAD^1)"
+                        else
+                          export BASE_SHA="$(git rev-parse HEAD^)"
+                        fi
+                        bash scripts/release/run-auto-release.sh
+                    '''
+                }
+            }
+        }
     }
 
     post {
         always {
             sh 'rm -rf "$CC9_HOME" "$CC9_BIN_DIR" || true'
+            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
             cleanWs()
         }
         unsuccessful {
-            echo '9cc CI failed. Run locally: bash 9cc/9cc.test.sh && bash 9cc/smoke.sh'
+            echo 'toolchain CI failed — check 9cc/atlassian tests or release scripts'
         }
     }
 }
