@@ -15,7 +15,7 @@ pub fn handleResult(ctx: render.Context, allocator: std.mem.Allocator, result: *
     defer result.deinit(allocator);
     return switch (result.*) {
         .ok => |r| {
-            render.successBody(ctx, r.body, r.body);
+            render.successBody(ctx, r.body);
             return exit_codes.ok;
         },
         .err => |e| render.failApi(ctx, e),
@@ -54,4 +54,3 @@ pub fn flagValue(rest: []const []const u8, name: []const u8) ?[]const u8 {
     }
     return null;
 }
-
