@@ -154,6 +154,35 @@ atlassian --markdown jira sprint current --assignee me
 atlassian --markdown jira issue search --assignee me --jql 'project = IVT'
 ```
 
+### OAuth: why `confluence space list` can 401 with “scope does not match”
+
+Confluence REST **v2** (what this CLI uses) needs **granular** scopes. Classic content scopes alone fail:
+
+| Command | API | Scopes |
+|---------|-----|--------|
+| `confluence space list` / `get` | `/wiki/api/v2/spaces` | `read:space:confluence` |
+| `confluence page list` / `get` | `/wiki/api/v2/pages` | `read:page:confluence` |
+| `confluence page create` / `update` | POST/PUT pages | `write:page:confluence` |
+| `confluence page delete` | DELETE pages | `delete:page:confluence` |
+
+Classic `read:confluence-content.all` / `write:confluence-content` are requested too, but **do not replace** the granular space/page scopes for v2.
+
+**Selecting all classic Confluence scopes is not enough** if granular space/page scopes are missing from either:
+
+1. the OAuth app permissions, or  
+2. the scopes string the CLI requests at `auth login` (see `DEFAULT_SCOPES` in `src/auth/oauth.zig`)
+
+```bash
+# 1) Enable granular Confluence scopes on the OAuth app
+# 2) Revoke old grant — no full reinstall of the CLI required
+#    https://id.atlassian.com/manage-profile/apps
+atlassian auth login
+atlassian auth status   # confluence_scope=ok
+atlassian confluence space list
+```
+
+`auth refresh` never adds new scopes. Rebuild/update the binary if your installed CLI predates the Confluence granular scope list, then re-login.
+
 ## Install via proto
 
 After a GitHub Release for tag `atlassian-vX.Y.Z` (checksums uploaded):
