@@ -340,7 +340,8 @@ fn writeFloat(allocator: Allocator, out: *std.ArrayList(u8), f: f64) EncodeError
         return;
     }
 
-    if (f == @trunc(f) and f >= @as(f64, @floatFromInt(std.math.minInt(i64))) and f <= @as(f64, @floatFromInt(std.math.maxInt(i64)))) {
+    // Stay within f64 safe integer range so @intFromFloat cannot overflow i64.
+    if (f == @trunc(f) and f >= -9007199254740991.0 and f <= 9007199254740991.0) {
         try out.print(allocator, "{d}", .{@as(i64, @intFromFloat(f))});
         return;
     }
