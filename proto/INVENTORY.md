@@ -1,7 +1,6 @@
 # investtal-toolchain — inventory
 
-Vendored, Investtal-owned proto toolchain plugins. Full rationale, integrity
-findings, and consumer instructions: [`docs/proto-plugins.md`](docs/proto-plugins.md).
+Vendored, Investtal-owned proto toolchain plugins. Full rationale, integrity findings, and consumer instructions.
 
 | Tool | File | Kind | Binary checksum | Audited |
 |------|------|------|-----------------|---------|
@@ -24,4 +23,4 @@ All verified end-to-end with `proto 0.56.4`: each TOML plugin resolves versions,
 downloads, and (where supported) verifies the binary checksum; the openjdk WASM
 plugin loads and lists Adoptium versions.
 
-Docs: [`proto/README.md`](proto/README.md) · longer notes: [`docs/ideas/proto-plugins.md`](docs/ideas/proto-plugins.md).
+Docs: [`proto/README.md`](proto/README.md).
