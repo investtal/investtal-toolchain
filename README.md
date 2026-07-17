@@ -36,8 +36,6 @@ investtal-toolchain/
 ├── 9cc/             # Claude Code model switcher + sandbox
 ├── git-hooks/       # Shared Landtal git hooks
 ├── docs/            # Specs, plans, longer write-ups
-├── INVENTORY.md     # Proto plugin audit table
-└── README.md        # This hub
 ```
 
 ## How consumers pin us
