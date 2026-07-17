@@ -11,11 +11,11 @@ const cmd_platform = @import("cmd_platform.zig");
 const cmd_confluence = @import("cmd_confluence.zig");
 const cmd_api = @import("cmd_api.zig");
 
+// Bumped together with build.zig.zon by scripts/release write_version (zig.zon).
 pub const VERSION = "0.1.0";
 
 const help_text =
-    \\atlassian — Investtal Atlassian CLI v0.1.0
-    \\
+    "atlassian — Investtal Atlassian CLI v" ++ VERSION ++ "\n\n" ++
     \\Usage:
     \\  atlassian [--json] [--config PATH] [-v] <product> <resource> <verb> [args]
     \\

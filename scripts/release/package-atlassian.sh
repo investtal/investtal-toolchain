@@ -24,6 +24,12 @@ case "$VERSION" in
   *) die "VERSION must be bare semver (got: $VERSION)" ;;
 esac
 
+# Windows targets need zip; fail early with a clear message.
+command -v zip >/dev/null 2>&1 \
+  || die "zip not found (required for Windows atlassian packages: atlassian_*_windows_*.zip)"
+command -v tar >/dev/null 2>&1 \
+  || die "tar not found (required for linux/macos atlassian packages)"
+
 mkdir -p "$OUT_DIR"
 # Resolve absolute OUT_DIR so archives land correctly after cd
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"

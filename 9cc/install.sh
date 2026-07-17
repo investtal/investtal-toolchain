@@ -21,14 +21,26 @@ pick_latest_9cc_tag() {
 
 # Resolve latest 9cc release tag: prefer 9cc-v*, else legacy v*
 resolve_latest_9cc_tag() {
-    local tags=""
+    local tags="" page_tags="" page=1
     if command -v gh >/dev/null 2>&1; then
-        tags="$(gh api "repos/investtal/investtal-toolchain/releases?per_page=100" --jq '.[].tag_name' 2>/dev/null || true)"
+        tags="$(gh api --paginate 'repos/investtal/investtal-toolchain/releases?per_page=100' \
+            --jq '.[].tag_name' 2>/dev/null || true)"
     else
-        tags="$(curl -fsSL --max-time 15 \
-            'https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100' 2>/dev/null \
-            | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
-            | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+        tags=""
+        while [ "$page" -le 2 ]; do
+            page_tags="$(curl -fsSL --max-time 15 \
+                "https://api.github.com/repos/investtal/investtal-toolchain/releases?per_page=100&page=${page}" 2>/dev/null \
+                | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' \
+                | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+            [ -n "$page_tags" ] || break
+            if [ -n "$tags" ]; then
+                tags="${tags}
+${page_tags}"
+            else
+                tags="$page_tags"
+            fi
+            page=$((page + 1))
+        done
     fi
     pick_latest_9cc_tag "$tags"
 }

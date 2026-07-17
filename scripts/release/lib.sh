@@ -49,6 +49,20 @@ read_version() {
   esac
 }
 
+# Sync atlassian CLI `pub const VERSION` with build.zig.zon when present.
+# Companion path: <pkg>/build.zig.zon → <pkg>/src/cli/root.zig
+sync_cli_version_const() {
+  local zon_file="$1" ver="$2"
+  local cli_root tmp
+  cli_root="$(dirname "$zon_file")/src/cli/root.zig"
+  [[ -f "$cli_root" ]] || return 0
+  tmp="$(mktemp)"
+  # pub const VERSION = "0.1.0";
+  sed -E "s/^(pub const VERSION = \")[0-9]+\\.[0-9]+\\.[0-9]+(\";.*)/\\1${ver}\\2/" \
+    "$cli_root" >"$tmp"
+  mv "$tmp" "$cli_root"
+}
+
 write_version() {
   local file="$1" kind="$2" ver="$3"
   case "$kind" in
@@ -63,6 +77,8 @@ write_version() {
       sed -E "s/^([[:space:]]*\\.version[[:space:]]*=[[:space:]]*\")[0-9]+\\.[0-9]+\\.[0-9]+(\".*)/\\1${ver}\\2/" \
         "$file" >"$tmp"
       mv "$tmp" "$file"
+      # Keep CLI VERSION const in lockstep (single bump path)
+      sync_cli_version_const "$file" "$ver"
       ;;
     *) die "unknown version_kind: $kind" ;;
   esac

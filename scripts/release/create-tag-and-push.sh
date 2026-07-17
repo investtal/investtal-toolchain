@@ -4,7 +4,8 @@ set -euo pipefail
 # Expects version file already bumped. Commits version file, creates annotated
 # tag {tool}-v{ver}, and pushes HEAD:main + the tag.
 # Env:
-#   GH_TOKEN or GITHUB_TOKEN — if set, rewrites origin to HTTPS with token
+#   GH_TOKEN or GITHUB_TOKEN — if set, push via one-shot HTTPS URL (token not
+#     written into origin remote config)
 #   GIT_USERNAME — optional (default x-access-token)
 #   GIT_AUTHOR_NAME / GIT_AUTHOR_EMAIL — commit identity
 #   BRANCH_NAME / GIT_BRANCH — Jenkins branch indicators (must be main for push)
@@ -42,7 +43,12 @@ fi
 
 if [[ "$tag_exists" -eq 0 ]]; then
   git add "$VERSION_FILE"
-  # include only version file for clean release commits
+  # Companion CLI VERSION const (atlassian/src/cli/root.zig) kept in sync by write_version
+  if [[ "${VERSION_KIND:-}" == "zig.zon" ]]; then
+    _cli_root="$(dirname "$VERSION_FILE")/src/cli/root.zig"
+    [[ -f "$_cli_root" ]] && git add "$_cli_root"
+  fi
+  # include only version file(s) for clean release commits
   if git commit -m "chore(release): ${tool} v${ver} [skip ci]"; then
     :
   else
@@ -54,13 +60,16 @@ fi
 
 # Always ensure tag (+ commit) are pushed when we reach here — including
 # the tag-already-exists path so a re-run can finish publish after partial failure.
+# Push via URL once — do NOT rewrite origin (avoids persisting token in remote config).
+require_main_for_push
 if [[ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]]; then
   user="${GIT_USERNAME:-x-access-token}"
   token="${GH_TOKEN:-$GITHUB_TOKEN}"
-  git remote set-url origin "https://${user}:${token}@github.com/investtal/investtal-toolchain.git"
+  push_url="https://${user}:${token}@github.com/investtal/investtal-toolchain.git"
+  git push "$push_url" HEAD:main
+  git push "$push_url" "refs/tags/${tag}"
+else
+  git push origin HEAD:main
+  git push origin "refs/tags/${tag}"
 fi
-
-require_main_for_push
-git push origin HEAD:main
-git push origin "$tag"
 echo "pushed $tag"
