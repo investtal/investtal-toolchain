@@ -2,3 +2,5 @@
 .DS_STORE
 .worktrees
 .sdd
+dist/
+.cache/
