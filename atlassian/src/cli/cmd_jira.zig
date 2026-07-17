@@ -140,8 +140,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             var result = jira_board.backlog(&sess.client, allocator, sess.site, sess.auth_header, board_id.?, jql, max) catch return render.fail(ctx, exit_codes.network, "request failed");
             switch (result) {
                 .err => |e| {
-                    if (e.status == 401) {
-
+                    if (e.status == 401 or e.status == 403) {
                         if (project) |pk| {
                             result.deinit(allocator);
                             const fb = buildBacklogJql(allocator, pk, extra, assignee) catch return render.fail(ctx, exit_codes.generic, "failed to build jql");
@@ -234,7 +233,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
                     .ok => |r| r.body,
                     .err => |e| {
 
-                        if (e.status == 401) {
+                        if (e.status == 401 or e.status == 403) {
                             const open_jql = buildOpenSprintsJql(allocator, extra, assignee) catch return render.fail(ctx, exit_codes.generic, "failed to build jql");
                             defer allocator.free(open_jql);
                             var result = jira_issue.search(&sess.client, allocator, sess.site, sess.auth_header, open_jql, max) catch return render.fail(ctx, exit_codes.network, "request failed");

@@ -79,7 +79,11 @@ pub fn firstActiveSprintId(allocator: Allocator, list_body: []const u8) !?[]u8 {
         switch (idv) {
             .integer => |n| return try std.fmt.allocPrint(allocator, "{d}", .{n}),
             .string => |s| return try allocator.dupe(u8, s),
-            .float => |f| return try std.fmt.allocPrint(allocator, "{d}", .{@as(i64, @intFromFloat(f))}),
+            .float => |f| {
+                if (!std.math.isFinite(f) or f != @trunc(f)) return null;
+                if (f < -9007199254740991.0 or f > 9007199254740991.0) return null;
+                return try std.fmt.allocPrint(allocator, "{d}", .{@as(i64, @intFromFloat(f))});
+            },
             else => {},
         }
     }

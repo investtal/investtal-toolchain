@@ -127,7 +127,9 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         var new_tokens = auth_oauth.refresh(&client, allocator, client_id, client_secret, rt) catch return render.fail(ctx, exit_codes.auth, "refresh failed");
         defer new_tokens.deinit(allocator);
         if (tokens.?.cloud_id) |cid| {
-            new_tokens.cloud_id = allocator.dupe(u8, cid) catch null;
+            new_tokens.cloud_id = allocator.dupe(u8, cid) catch {
+                return render.fail(ctx, exit_codes.generic, "failed to copy cloud_id on refresh");
+            };
         }
         auth_store.saveTokens(allocator, io, new_tokens) catch return render.fail(ctx, exit_codes.generic, "failed to save tokens");
         render.successText(ctx, "refreshed");

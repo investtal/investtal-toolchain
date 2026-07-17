@@ -42,7 +42,7 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
                             if (auth_oauth.refresh(&client, allocator, cid, sec, rt)) |new_t| {
                                 var nt = new_t;
                                 if (t.cloud_id) |c| {
-                                    nt.cloud_id = allocator.dupe(u8, c) catch null;
+                                    nt.cloud_id = try allocator.dupe(u8, c);
                                 }
                                 auth_store.saveTokens(allocator, io, nt) catch {};
                                 t.deinit(allocator);
