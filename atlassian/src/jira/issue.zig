@@ -34,7 +34,6 @@ pub fn deleteIssue(client: *http_client.Client, allocator: Allocator, site: tran
 }
 
 pub fn search(client: *http_client.Client, allocator: Allocator, site: transport.Site, auth: []const u8, jql: []const u8, max_results: u32) !http_client.Result {
-    // Jira Cloud v3 enhanced search endpoint
     const url = try site.resolve(allocator, .jira, "search/jql");
     defer allocator.free(url);
     const jql_q = try quote(allocator, jql);

@@ -30,7 +30,6 @@ pub fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !
     errdefer cfg.deinit(allocator);
     var tokens = auth_store.loadTokens(allocator, io) catch null;
 
-    // OAuth ensureValid: refresh when access token is near absolute expiry.
     if (cfg.auth_mode == .oauth) {
         if (tokens) |*t| {
             const now = Io.Clock.real.now(io).toSeconds();

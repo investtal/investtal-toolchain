@@ -3,8 +3,6 @@ const Allocator = std.mem.Allocator;
 const http_client = @import("../http/client.zig");
 const transport = @import("../http/transport.zig");
 
-// Docs: https://developer.atlassian.com/platform/teams/components/team-public-rest-api/
-
 pub fn create(client: *http_client.Client, allocator: Allocator, site: transport.Site, auth: []const u8, org_id: []const u8, body_json: []const u8) !http_client.Result {
     const path = try std.fmt.allocPrint(allocator, "public/teams/v1/org/{s}/teams/", .{org_id});
     defer allocator.free(path);

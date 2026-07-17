@@ -44,7 +44,6 @@ pub fn execute(
         .body = body,
     });
 
-    // Surface GraphQL errors via structured JSON parse (not substring scan).
     switch (result) {
         .ok => |r| {
             var parsed = std.json.parseFromSlice(GqlResponse, allocator, r.body, .{

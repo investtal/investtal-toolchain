@@ -5,7 +5,6 @@ const Io = std.Io;
 pub const TokenSet = struct {
     access_token: []const u8,
     refresh_token: ?[]const u8 = null,
-    /// Absolute Unix epoch seconds when access_token expires.
     expires_at_unix: i64 = 0,
     scope: ?[]const u8 = null,
     cloud_id: ?[]const u8 = null,
@@ -74,7 +73,6 @@ pub fn saveTokens(allocator: Allocator, io: Io, tokens: TokenSet) !void {
     const json = try std.json.Stringify.valueAlloc(allocator, payload, .{});
     defer allocator.free(json);
 
-    // Spec: credentials file mode 0600 (owner read/write only).
     try Io.Dir.cwd().writeFile(io, .{
         .sub_path = path,
         .data = json,
@@ -112,7 +110,6 @@ pub fn clearTokens(allocator: Allocator, io: Io) !void {
 }
 
 test "saveTokens json escapes special chars in token" {
-    // Round-trip via stringify/parse without filesystem.
     const payload = StoredTokens{
         .access_token = "a\"b\\c",
         .refresh_token = null,

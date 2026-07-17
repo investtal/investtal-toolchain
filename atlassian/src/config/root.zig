@@ -190,7 +190,6 @@ fn ensureParentDirs(io: Io, path: []const u8) !void {
     const parent = std.fs.path.dirname(path) orelse return;
     if (parent.len == 0 or std.mem.eql(u8, parent, "/") or std.mem.eql(u8, parent, ".")) return;
 
-    // Create intermediate directories one by one (works for absolute paths).
     var i: usize = if (std.fs.path.isAbsolute(parent)) 1 else 0;
     while (i <= parent.len) : (i += 1) {
         if (i != parent.len and parent[i] != '/') continue;
@@ -224,7 +223,6 @@ pub fn save(allocator: Allocator, io: Io, cfg: Config, path: []const u8) !void {
     try w.print("retries = {d}\n", .{cfg.http_retries});
     try w.flush();
 
-    // Restrict config when it may hold secrets (token / oauth secret).
     const mode: Io.File.Permissions = if (cfg.api_token != null or cfg.oauth_client_secret != null)
         @enumFromInt(0o600)
     else
