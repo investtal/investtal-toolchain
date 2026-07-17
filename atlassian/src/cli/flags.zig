@@ -1,12 +1,19 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const OutputFormat = @import("output_format.zig").OutputFormat;
 
 pub const Global = struct {
-    json: bool = false,
+    /// Success body format. Default: toon.
+    format: OutputFormat = .toon,
     config_path: ?[]const u8 = null,
     verbose: bool = false,
     rest: []const []const u8 = &.{},
     rest_owned: ?[][]const u8 = null,
+
+    /// Back-compat helper for call sites that only care about JSON error shape.
+    pub fn json(self: Global) bool {
+        return self.format.isJson();
+    }
 
     pub fn deinit(self: *Global, allocator: Allocator) void {
         if (self.config_path) |p| allocator.free(p);
@@ -40,7 +47,25 @@ pub fn parse(allocator: Allocator, args: []const []const u8) !Global {
             continue;
         }
         if (!past_flags and std.mem.eql(u8, a, "--json")) {
-            g.json = true;
+            g.format = .json;
+            continue;
+        }
+        if (!past_flags and (std.mem.eql(u8, a, "--markdown") or std.mem.eql(u8, a, "--md"))) {
+            g.format = .markdown;
+            continue;
+        }
+        if (!past_flags and std.mem.eql(u8, a, "--toon")) {
+            g.format = .toon;
+            continue;
+        }
+        if (!past_flags and std.mem.eql(u8, a, "--format")) {
+            i += 1;
+            if (i >= args.len) return error.MissingFormat;
+            g.format = OutputFormat.parse(args[i]) orelse return error.InvalidFormat;
+            continue;
+        }
+        if (!past_flags and std.mem.startsWith(u8, a, "--format=")) {
+            g.format = OutputFormat.parse(a["--format=".len..]) orelse return error.InvalidFormat;
             continue;
         }
         if (!past_flags and (std.mem.eql(u8, a, "-v") or std.mem.eql(u8, a, "--verbose"))) {
@@ -72,8 +97,39 @@ test "parse extracts --json and --config" {
     const args = [_][]const u8{ "atlassian", "--json", "--config", "/tmp/c.toml", "config", "list" };
     var g = try parse(a, args[0..]);
     defer g.deinit(a);
-    try std.testing.expect(g.json);
+    try std.testing.expect(g.format == .json);
     try std.testing.expectEqualStrings("/tmp/c.toml", g.config_path.?);
     try std.testing.expectEqual(@as(usize, 2), g.rest.len);
     try std.testing.expectEqualStrings("config", g.rest[0]);
+}
+
+test "parse default format is toon" {
+    const a = std.testing.allocator;
+    const args = [_][]const u8{ "atlassian", "jira", "issue", "get", "X-1" };
+    var g = try parse(a, args[0..]);
+    defer g.deinit(a);
+    try std.testing.expect(g.format == .toon);
+}
+
+test "parse --markdown and --format" {
+    const a = std.testing.allocator;
+    {
+        const args = [_][]const u8{ "atlassian", "--markdown", "jira", "issue", "get", "X-1" };
+        var g = try parse(a, args[0..]);
+        defer g.deinit(a);
+        try std.testing.expect(g.format == .markdown);
+    }
+    {
+        const args = [_][]const u8{ "atlassian", "--format=json", "jira", "issue", "get", "X-1" };
+        var g = try parse(a, args[0..]);
+        defer g.deinit(a);
+        try std.testing.expect(g.format == .json);
+    }
+    {
+        // last flag wins
+        const args = [_][]const u8{ "atlassian", "--json", "--toon", "jira", "issue", "get", "X-1" };
+        var g = try parse(a, args[0..]);
+        defer g.deinit(a);
+        try std.testing.expect(g.format == .toon);
+    }
 }
