@@ -2,7 +2,7 @@
 
 **Investtal-owned developer tools, supply-chain pins, and shared automation.**
 
-This public monorepo is where we put the software engineers at Investtal actually run every day — CLIs we build, proto plugins we audit and vendor, git hooks that keep task IDs honest, and the CI that gates them. Private product repos (`investtal-portals`, `investtal-apis`, `devops-investtal`, …) **pin into this repo**; they do not pull toolchain definitions from random third-party GitHub accounts.
+This public monorepo is where we put the software engineers at Investtal actually run every day — CLIs we build, proto plugins we audit and vendor, git hooks that keep task IDs honest, and the CI that gates them. Private product repos **pin into this repo**; they do not pull toolchain definitions from random third-party GitHub accounts.
 
 ## Why this exists
 
@@ -24,7 +24,6 @@ This public monorepo is where we put the software engineers at Investtal actuall
 | **atlassian** | Zig CLI for Atlassian Cloud (Jira, Confluence, Goals, Teams) | One binary for day-to-day ops + scripts; OAuth/Basic; release + proto install | [`atlassian/README.md`](atlassian/README.md) |
 | **9cc** | Claude Code model switcher over 9Router (+ Docker sandbox) | Agents and humans pick models without hand-editing Claude settings | [`9cc/README.md`](9cc/README.md) |
 | **git-hooks** | Native hooks: IVT branch policy + commit subject task-id suffix | Same branch/commit contract across the monorepo family | [`git-hooks/README.md`](git-hooks/README.md) |
-| **jenkins** | Jenkinsfiles for toolchain CI (e.g. 9cc tests/smoke) | Prove install/update paths before we trust them in production | [`jenkins/README.md`](jenkins/README.md) |
 
 Deep design notes and implementation plans live under [`docs/`](docs/) (ideas, specs, plans). **How to install and use a tool is always in that tool’s `README.md`.**
 
@@ -36,7 +35,6 @@ investtal-toolchain/
 ├── atlassian/       # Atlassian Cloud CLI (Zig)
 ├── 9cc/             # Claude Code model switcher + sandbox
 ├── git-hooks/       # Shared Landtal git hooks
-├── jenkins/         # Toolchain CI
 ├── docs/            # Specs, plans, longer write-ups
 ├── INVENTORY.md     # Proto plugin audit table
 └── README.md        # This hub
