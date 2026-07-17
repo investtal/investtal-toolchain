@@ -6,6 +6,8 @@ type = "cli"
 
 [resolve]
 git-url = "https://github.com/investtal/investtal-toolchain"
+# Monorepo has many tags (v*, 9cc-v*, atlassian-v*). Only atlassian-v* are this tool.
+git-tag-pattern = "^atlassian-v(.*)$"
 
 [platform.linux]
 exe-path = "atlassian"
