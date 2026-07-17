@@ -1,0 +1,3 @@
+# name|kind|version_file|version_kind|path_globs (comma-separated)
+atlassian|binary|atlassian/build.zig.zon|zig.zon|atlassian/**,proto/atlassian/**
+9cc|source-tag|9cc/VERSION|plain|9cc/**
