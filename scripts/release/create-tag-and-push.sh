@@ -48,11 +48,10 @@ if [[ "$tag_exists" -eq 0 ]]; then
     _cli_root="$(dirname "$VERSION_FILE")/src/cli/root.zig"
     [[ -f "$_cli_root" ]] && git add "$_cli_root"
   fi
-  # include only version file(s) for clean release commits
-  if git commit -m "chore(release): ${tool} v${ver} [skip ci]"; then
-    :
+  # Commit only when staged changes exist — real commit failures must halt.
+  if ! git diff --cached --quiet; then
+    git commit -m "chore(release): ${tool} v${ver} [skip ci]"
   else
-    # nothing to commit (already at version)
     echo "no version commit needed"
   fi
   git tag -a "$tag" -m "Release ${tag}"
