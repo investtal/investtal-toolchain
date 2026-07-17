@@ -5,9 +5,7 @@ pub const Global = struct {
     json: bool = false,
     config_path: ?[]const u8 = null,
     verbose: bool = false,
-    /// Remaining args after argv0 and global flags (owned slices when allocated).
     rest: []const []const u8 = &.{},
-    /// Backing storage for rest when we own it.
     rest_owned: ?[][]const u8 = null,
 
     pub fn deinit(self: *Global, allocator: Allocator) void {
@@ -21,7 +19,6 @@ pub const Global = struct {
     }
 };
 
-/// Parse global flags from full argv (including argv0). Rest excludes argv0.
 pub fn parse(allocator: Allocator, args: []const []const u8) !Global {
     var g: Global = .{};
     errdefer g.deinit(allocator);

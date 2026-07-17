@@ -78,7 +78,6 @@ pub fn failApi(ctx: Context, err: ApiError) u8 {
 }
 
 test "fail json escapes control chars in message" {
-    // Smoke: Stringify escapes newlines/quotes for us.
     const a = std.testing.allocator;
     const s = try std.json.Stringify.valueAlloc(a, .{ .message = "a\nb\"c" }, .{});
     defer a.free(s);

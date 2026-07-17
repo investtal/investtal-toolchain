@@ -18,13 +18,11 @@ pub const Site = struct {
     cloud_id: ?[]const u8 = null,
     auth_mode: AuthMode = .basic,
 
-    /// `path` without leading slash.
     pub fn resolve(self: Site, allocator: Allocator, product: Product, path: []const u8) ![]u8 {
         const clean_path = if (path.len > 0 and path[0] == '/') path[1..] else path;
         const base = std.mem.trimEnd(u8, self.base_url, "/");
 
         if (self.kind == .server_dc) {
-            // Future path map; for now same as cloud basic relative to base_url.
             return resolveCloudBasic(allocator, base, product, clean_path);
         }
 
@@ -71,7 +69,6 @@ fn resolveCloudOAuth(allocator: Allocator, base: []const u8, cloud_id: ?[]const 
                 return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/confluence/{s}/wiki/api/v2", .{cid});
             return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/confluence/{s}/wiki/api/v2/{s}", .{ cid, path });
         },
-        // Gateway/GraphQL/Jira Software: site host with Bearer (v0.1).
         .jira_software, .gateway, .graphql => return resolveCloudBasic(allocator, base, product, path),
     }
 }

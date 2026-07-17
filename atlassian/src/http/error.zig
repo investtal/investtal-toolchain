@@ -18,10 +18,8 @@ pub const ApiError = struct {
     details: ?[]const u8 = null,
     request_id: ?[]const u8 = null,
     retriable: bool = false,
-    /// Whether message/code/details were allocated by us.
     owns_message: bool = false,
 
-    /// Map to CLI exit codes (kept here as pure numbers so http does not import cli).
     pub fn exitCode(self: ApiError) u8 {
         return switch (self.kind) {
             .not_implemented => 6,
@@ -66,7 +64,6 @@ pub const ApiError = struct {
 
         if (body.len > 0) {
             if (std.mem.indexOf(u8, body, "\"errorMessages\"")) |_| {
-                // Prefer first errorMessages entry if present.
                 if (extractJsonStringArrayFirst(body, "errorMessages")) |msg| {
                     message = try allocator.dupe(u8, msg);
                     owns = true;
@@ -117,7 +114,6 @@ pub const ApiError = struct {
     }
 };
 
-/// Naive extractors — good enough for Atlassian error bodies in unit tests.
 fn extractJsonString(body: []const u8, key: []const u8) ?[]const u8 {
     var needle_buf: [128]u8 = undefined;
     const needle = std.fmt.bufPrint(&needle_buf, "\"{s}\"", .{key}) catch return null;

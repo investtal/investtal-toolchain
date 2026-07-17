@@ -48,7 +48,6 @@ pub fn flagValue(rest: []const []const u8, name: []const u8) ?[]const u8 {
             if (i + 1 < rest.len) return rest[i + 1];
             return null;
         }
-        // Match --flag=value without heap allocation.
         if (rest[i].len > name.len + 1 and std.mem.startsWith(u8, rest[i], name) and rest[i][name.len] == '=') {
             return rest[i][name.len + 1 ..];
         }

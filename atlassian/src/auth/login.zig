@@ -6,8 +6,6 @@ const http_client = @import("../http/client.zig");
 const oauth = @import("oauth.zig");
 const store = @import("store.zig");
 
-/// Interactive OAuth login: open browser + loopback callback.
-/// Returns owned TokenSet.
 pub fn interactiveLogin(allocator: Allocator, io: Io, cfg: config_mod.Config, scopes: []const u8) !store.TokenSet {
     const client_id = cfg.oauth_client_id orelse return error.MissingOAuthClientId;
     const client_secret = cfg.oauth_client_secret orelse return error.MissingOAuthClientSecret;
@@ -44,7 +42,6 @@ pub fn interactiveLogin(allocator: Allocator, io: Io, cfg: config_mod.Config, sc
     var tokens = try oauth.exchangeCode(&client, allocator, client_id, client_secret, code, redirect_uri);
     errdefer tokens.deinit(allocator);
 
-    // Resolve cloud id from accessible-resources
     if (try fetchCloudId(allocator, &client, tokens.access_token, cfg.url)) |cid| {
         if (tokens.cloud_id) |old| allocator.free(old);
         tokens.cloud_id = cid;
@@ -93,7 +90,6 @@ fn waitForCallback(allocator: Allocator, io: Io, port: u16, expected_state: []co
     var rbuf: [4096]u8 = undefined;
     var reader = stream.reader(io, &rbuf);
     var req_buf: [4096]u8 = undefined;
-    // Read first line-ish of HTTP request (enough for query string).
     var n: usize = 0;
     while (n < req_buf.len) {
         const got = reader.interface.readSliceShort(req_buf[n..]) catch break;
@@ -126,7 +122,6 @@ fn findQueryParam(req: []const u8, key: []const u8) ?[]const u8 {
         const eq = std.mem.indexOfScalar(u8, pair, '=') orelse continue;
         if (std.mem.eql(u8, pair[0..eq], key)) {
             var val = pair[eq + 1 ..];
-            // trim HTTP remainder
             if (std.mem.indexOfScalar(u8, val, ' ')) |s| val = val[0..s];
             if (std.mem.indexOfScalar(u8, val, '\r')) |s| val = val[0..s];
             return val;

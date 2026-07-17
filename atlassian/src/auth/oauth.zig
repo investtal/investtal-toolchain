@@ -9,7 +9,6 @@ pub const DEFAULT_SCOPES =
     \\read:jira-work write:jira-work read:jira-user offline_access read:confluence-content.all write:confluence-content manage:confluence-content read:me
 ;
 
-/// RFC 3986-ish query component encoding (unreserved + sub-delims kept simple).
 fn urlEncodeQuery(allocator: Allocator, s: []const u8) ![]u8 {
     var list: std.ArrayList(u8) = .empty;
     errdefer list.deinit(allocator);
@@ -49,7 +48,6 @@ const TokenResponse = struct {
     scope: ?[]const u8 = null,
 };
 
-/// `now_unix` is wall-clock seconds (absolute). `expires_at_unix` is set to now + expires_in.
 pub fn parseTokenJson(allocator: Allocator, body: []const u8, now_unix: i64) !store.TokenSet {
     var parsed = try std.json.parseFromSlice(TokenResponse, allocator, body, .{
         .allocate = .alloc_always,
@@ -143,6 +141,5 @@ test "authorizeUrl uses encoded redirect_uri" {
     defer std.testing.allocator.free(u);
     try std.testing.expect(std.mem.indexOf(u8, u, "client_id=CID") != null);
     try std.testing.expect(std.mem.indexOf(u8, u, "state=STATE") != null);
-    // ':' and '/' must be percent-encoded in redirect_uri
     try std.testing.expect(std.mem.indexOf(u8, u, "redirect_uri=http%3A%2F%2F127.0.0.1%3A8787%2Fcallback") != null);
 }

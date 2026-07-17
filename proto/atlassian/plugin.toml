@@ -1,9 +1,5 @@
-# @investtal/proto-plugins — atlassian (Investtal Atlassian CLI)
-#
-# Cross-platform Zig CLI for Jira / Confluence / Goals / Teams.
-# Binaries published via GitHub Releases on tag atlassian-v*.
-#
-# Docs: https://moonrepo.dev/docs/proto/non-wasm-plugin
+# @investtal/proto-plugins — atlassian
+# Upstream release: investtal/investtal-toolchain tags atlassian-v*
 
 name = "Atlassian CLI"
 type = "cli"

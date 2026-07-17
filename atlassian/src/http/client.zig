@@ -36,7 +36,6 @@ pub const Result = union(enum) {
     }
 };
 
-/// Optional fake transport for unit tests (no network).
 pub const FakeHop = struct {
     status: u16,
     body: []const u8 = "",
@@ -48,7 +47,6 @@ pub const Client = struct {
     io: Io,
     retries: u8 = 3,
     verbose: bool = false,
-    /// When non-null, used instead of real HTTP (test injection).
     fake_hops: ?[]const FakeHop = null,
     fake_index: usize = 0,
 
@@ -90,7 +88,6 @@ pub const Client = struct {
 
             if (attempt + 1 >= self.retries) break;
 
-            // Backoff: honor Retry-After seconds if present, else exponential.
             const delay_ms: u64 = blk: {
                 if (hop.retry_after) |ra| {
                     if (std.fmt.parseInt(u64, ra, 10)) |sec| break :blk sec * 1000 else |_| {}
@@ -100,7 +97,6 @@ pub const Client = struct {
             if (self.fake_hops == null) {
                 self.io.sleep(.fromMilliseconds(@intCast(delay_ms)), .awake) catch {};
             }
-            // free body before next attempt
             self.allocator.free(hop.body);
             if (hop.request_id) |r| self.allocator.free(r);
             last_body_owned = false;

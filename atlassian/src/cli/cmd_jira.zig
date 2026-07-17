@@ -16,7 +16,6 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
     const verb = global.rest[2];
     const rest = global.rest[3..];
 
-    // Catalog stubs that must not require credentials.
     if (std.mem.eql(u8, resource, "project") and (std.mem.eql(u8, verb, "create") or std.mem.eql(u8, verb, "update") or std.mem.eql(u8, verb, "delete"))) {
         return util.notImpl(ctx, "jira project create|update|delete");
     }

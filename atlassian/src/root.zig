@@ -1,4 +1,3 @@
-//! Atlassian CLI library root — re-exports modules for tests and embedding.
 const std = @import("std");
 
 pub const exit_codes = @import("cli/exit_codes.zig");
