@@ -156,8 +156,7 @@ atlassian/
       comment.zig
     api/
       raw.zig                # escape hatch
-  .github/workflows/
-    atlassian-release.yml    # or monorepo path-filtered workflow
+  # Release packaging: scripts/release/ + jenkins/Jenkinsfile (tags atlassian-v*)
 proto/
   atlassian/
     plugin.toml
@@ -460,7 +459,9 @@ No mixing of progress noise on stdout in JSON mode.
 - Semver for the CLI package (`build.zig.zon` / release notes)
 - Git tags: **`atlassian-vX.Y.Z`** (prefix avoids colliding with other monorepo tags)
 
-### 11.2 CI (GitHub Actions)
+### 11.2 CI (Jenkins)
+
+> **Note (2026-07-17):** CI/CD moved off GitHub Actions to **Jenkins** (`jenkins/Jenkinsfile`). Tags `atlassian-v*` are created by Jenkins auto-release; GitHub Releases remain the distribution host only. See [`2026-07-17-toolchain-release-jenkins-design.md`](./2026-07-17-toolchain-release-jenkins-design.md).
 
 On tag `atlassian-v*`:
 

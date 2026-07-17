@@ -84,8 +84,11 @@ After a GitHub Release for tag `atlassian-vX.Y.Z` (checksums uploaded):
 atlassian = "https://raw.githubusercontent.com/investtal/investtal-toolchain/<COMMIT_SHA>/proto/atlassian/plugin.toml"
 ```
 
-Plugin definition: [`../proto/atlassian/plugin.toml`](../proto/atlassian/plugin.toml).  
-Release workflow: [`.github/workflows/atlassian-release.yml`](../.github/workflows/atlassian-release.yml) (Actions pinned by commit SHA).
+Plugin definition: [`../proto/atlassian/plugin.toml`](../proto/atlassian/plugin.toml).
+
+## Release
+
+Releases are **Jenkins-only** (`../jenkins/Jenkinsfile`). On merge to `main`, when `atlassian/` changes, CI bumps the version, tags **`atlassian-vX.Y.Z`**, packages multi-arch binaries via [`../scripts/release/package-atlassian.sh`](../scripts/release/package-atlassian.sh), and uploads assets + checksums to a GitHub Release (distribution host only). Manual tags are not required.
 
 ## Design
 

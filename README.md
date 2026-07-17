@@ -57,7 +57,19 @@ Never re-point consumers at the original third-party proto plugin repos. That un
 1. Work on an `IVT-XXXX-…` branch (enforced by git-hooks).
 2. Put tool-specific docs in that tool’s `README.md`, not only in the root.
 3. For proto plugin changes: update inventory, verify checksum install, then bump SHAs in every consumer `.prototools`.
-4. For CLIs: keep offline tests green; release artifacts go through GitHub Releases with checksums where applicable.
+4. For CLIs: keep offline tests green; release artifacts go through Jenkins → GitHub Releases with checksums where applicable.
+
+## Release (Jenkins only)
+
+CI/CD runs on **Jenkins** (`jenkins/Jenkinsfile`). GitHub Actions are not used.
+
+On every merge to `main`, if a registered tool under `scripts/release/tools.manifest` changed:
+
+1. Bump that tool’s version from the PR title (Conventional Commits).
+2. Tag `{tool}-vX.Y.Z` and push.
+3. For binary tools (atlassian), cross-build and upload assets to a **GitHub Release** (distribution host only).
+
+Manual tags for release are not required. Do not reintroduce `.github/workflows/*` for CI.
 
 ## License / ownership
 
