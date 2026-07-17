@@ -12,7 +12,6 @@ pub fn listForBoard(client: *http_client.Client, allocator: Allocator, site: tra
     return client.request(.{ .method = .GET, .url = url, .auth_header = auth });
 }
 
-/// List sprints for a board filtered by state (`active`, `future`, `closed`).
 pub fn listForBoardState(
     client: *http_client.Client,
     allocator: Allocator,
@@ -36,7 +35,6 @@ pub fn get(client: *http_client.Client, allocator: Allocator, site: transport.Si
     return client.request(.{ .method = .GET, .url = url, .auth_header = auth });
 }
 
-/// Issues in a sprint (Agile). Optional JQL (assignee filter) and maxResults.
 pub fn issues(
     client: *http_client.Client,
     allocator: Allocator,
@@ -69,7 +67,6 @@ fn buildSprintIssuesPath(allocator: Allocator, sprint_id: []const u8, jql: ?[]co
     return try list.toOwnedSlice(allocator);
 }
 
-/// First active sprint id on the board (owned slice), or null if none.
 pub fn firstActiveSprintId(allocator: Allocator, list_body: []const u8) !?[]u8 {
     var parsed = try std.json.parseFromSlice(std.json.Value, allocator, list_body, .{ .allocate = .alloc_always });
     defer parsed.deinit();

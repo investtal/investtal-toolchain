@@ -1,8 +1,4 @@
-//! JSON → TOON encoder (encode-only).
-//! Subset of TOON SPEC v3.3 used for CLI success bodies:
-//! objects, nested objects, primitive arrays, tabular arrays, expanded lists.
-//! Defaults: indentSize=2, delimiter=comma, keyFolding=off.
-//! Spec: https://github.com/toon-format/spec
+
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -22,7 +18,7 @@ pub fn encodeAlloc(allocator: Allocator, json_bytes: []const u8) ![]u8 {
     var list: std.ArrayList(u8) = .empty;
     errdefer list.deinit(allocator);
     try encodeRoot(allocator, &list, parsed.value);
-    // Spec §12: no trailing newline at end of document.
+
     while (list.items.len > 0 and list.items[list.items.len - 1] == '\n') {
         _ = list.pop();
     }
@@ -133,7 +129,7 @@ fn encodeListItem(allocator: Allocator, out: *std.ArrayList(u8), item: Value, de
             const fk = first.key_ptr.*;
             const fv = first.value_ptr.*;
 
-            // Tabular array as first field (§10)
+
             if (fv == .array) {
                 if (try tabularFields(allocator, fv.array.items)) |fields| {
                     defer allocator.free(fields);
@@ -239,7 +235,6 @@ fn isPrimitive(v: Value) bool {
     };
 }
 
-/// Owned slice of field names when tabular-eligible; null otherwise.
 fn tabularFields(allocator: Allocator, items: []const Value) EncodeError!?[]const []const u8 {
     if (items.len == 0) return null;
     for (items) |item| {
@@ -344,7 +339,7 @@ fn writeFloat(allocator: Allocator, out: *std.ArrayList(u8), f: f64) EncodeError
         try out.append(allocator, '0');
         return;
     }
-    // Prefer integer form when exact
+
     if (f == @trunc(f) and f >= @as(f64, @floatFromInt(std.math.minInt(i64))) and f <= @as(f64, @floatFromInt(std.math.maxInt(i64)))) {
         try out.print(allocator, "{d}", .{@as(i64, @intFromFloat(f))});
         return;
@@ -368,7 +363,7 @@ fn needsQuote(s: []const u8, active_delim: u8) bool {
 }
 
 fn isNumericLike(s: []const u8) bool {
-    // /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
+
     if (s.len == 0) return false;
     var i: usize = 0;
     if (s[0] == '-') {

@@ -27,16 +27,6 @@ pub fn successJson(ctx: Context, bytes: []const u8) void {
     ctx.out.flush() catch {};
 }
 
-/// Render a successful API body according to `ctx.format`.
-///
-/// For Jira **issue** / **search** payloads, all three modes use the same **main-field**
-/// curation (preferred system + valued custom fields; noise dropped):
-/// - **toon** (default): curated JSON → TOON
-/// - **markdown**: curated fields as aligned Markdown tables/sections
-/// - **json**: curated compact JSON
-///
-/// Other resources still pass through the full body (TOON-encoded when not json).
-/// Use `atlassian api request …` for full raw issue JSON when needed.
 pub fn successBody(ctx: Context, body: []const u8) void {
     const trimmed = std.mem.trim(u8, body, " \t\r\n");
     if (trimmed.len == 0) {
@@ -49,7 +39,7 @@ pub fn successBody(ctx: Context, body: []const u8) void {
         return;
     }
 
-    // Curate Jira issue/search-shaped payloads into main fields for all formats.
+
     const curated = markdown.curateAlloc(ctx.allocator, body) catch null;
     defer if (curated) |c| ctx.allocator.free(c);
     const payload = curated orelse body;
@@ -65,7 +55,7 @@ pub fn successBody(ctx: Context, body: []const u8) void {
             successText(ctx, encoded);
         },
         .markdown => {
-            // Markdown always goes through its own renderer (aligned tables + labels).
+
             const encoded = markdown.encodeAlloc(ctx.allocator, body) catch {
                 successText(ctx, body);
                 return;

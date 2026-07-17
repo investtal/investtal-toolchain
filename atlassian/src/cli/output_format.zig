@@ -1,7 +1,5 @@
 const std = @import("std");
 
-/// Success-body output modes for API responses.
-/// Default is TOON (token-efficient for humans + AI).
 pub const OutputFormat = enum {
     toon,
     markdown,

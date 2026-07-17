@@ -4,7 +4,7 @@ const http_client = @import("../http/client.zig");
 const transport = @import("../http/transport.zig");
 
 pub fn get(client: *http_client.Client, allocator: Allocator, site: transport.Site, auth: []const u8, key: []const u8) !http_client.Result {
-    // expand=names,schema → human labels + field type map for markdown formatting.
+
     const path = try std.fmt.allocPrint(allocator, "issue/{s}?expand=names,schema", .{key});
     defer allocator.free(path);
     const url = try site.resolve(allocator, .jira, path);
@@ -39,7 +39,7 @@ pub fn search(client: *http_client.Client, allocator: Allocator, site: transport
     defer allocator.free(url);
     const jql_q = try quote(allocator, jql);
     defer allocator.free(jql_q);
-    // New /search/jql returns only issue ids unless fields are requested.
+
     const body = try std.fmt.allocPrint(allocator,
         \\{{"jql":{s},"maxResults":{d},"fields":["summary","status","assignee","priority","issuetype","updated","duedate","created","project","labels","description","parent","components","fixVersions"]}}
     , .{ jql_q, max_results });
