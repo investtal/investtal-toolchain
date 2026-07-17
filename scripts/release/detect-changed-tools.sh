@@ -31,11 +31,13 @@ if [[ -n "${BASE_SHA:-}" ]]; then
   HEAD_SHA="${HEAD_SHA:-HEAD}"
   # Avoid process substitution edge cases; use temp file for portability
   _diff_tmp="$(mktemp)"
+  trap 'rm -f "$_diff_tmp"' EXIT
   git -C "$REPO_ROOT" diff --name-only "$BASE_SHA" "$HEAD_SHA" >"$_diff_tmp"
   while IFS= read -r p || [[ -n "$p" ]]; do
     [[ -n "$p" ]] && paths+=("$p")
   done <"$_diff_tmp"
   rm -f "$_diff_tmp"
+  trap - EXIT
 else
   while IFS= read -r p || [[ -n "$p" ]]; do
     [[ -n "$p" ]] && paths+=("$p")
