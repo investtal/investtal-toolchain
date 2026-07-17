@@ -36,5 +36,9 @@ assert_eq 0.2.0 "$(semver_bump 0.1.5 minor)" "minor"
 assert_eq 1.0.0 "$(semver_bump 0.9.9 major)" "major"
 assert_eq 0.1.6 "$(semver_bump 0.1.5 patch)" "patch"
 
+echo "== read_version zig.zon =="
+load_tool atlassian
+assert_eq 0.1.0 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "atlassian build.zig.zon"
+
 echo "passed=$pass failed=$fail"
 [[ "$fail" -eq 0 ]]

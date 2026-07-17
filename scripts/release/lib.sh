@@ -41,7 +41,8 @@ read_version() {
       ;;
     zig.zon)
       # .version = "0.1.0",
-      grep -E '^\s*\.version\s*=' "$file" | head -n1 \
+      # Use [[:space:]] not \s — BSD grep (macOS) does not support \s
+      grep -E '^[[:space:]]*\.version[[:space:]]*=' "$file" | head -n1 \
         | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/'
       ;;
     *) die "unknown version_kind: $kind" ;;
@@ -56,9 +57,10 @@ write_version() {
       ;;
     zig.zon)
       # portable: rewrite .version line only
+      # Use [[:space:]] not \s — BSD sed/grep (macOS) do not support \s
       local tmp
       tmp="$(mktemp)"
-      sed -E "s/^(\\s*\\.version\\s*=\\s*\")[0-9]+\\.[0-9]+\\.[0-9]+(\".*)/\\1${ver}\\2/" \
+      sed -E "s/^([[:space:]]*\\.version[[:space:]]*=[[:space:]]*\")[0-9]+\\.[0-9]+\\.[0-9]+(\".*)/\\1${ver}\\2/" \
         "$file" >"$tmp"
       mv "$tmp" "$file"
       ;;
