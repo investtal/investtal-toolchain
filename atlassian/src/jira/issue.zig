@@ -37,26 +37,18 @@ pub fn deleteIssue(client: *http_client.Client, allocator: Allocator, site: tran
 pub fn search(client: *http_client.Client, allocator: Allocator, site: transport.Site, auth: []const u8, jql: []const u8, max_results: u32) !http_client.Result {
     const url = try site.resolve(allocator, .jira, "search/jql");
     defer allocator.free(url);
-    const jql_q = try quote(allocator, jql);
-    defer allocator.free(jql_q);
-
-    const body = try std.fmt.allocPrint(allocator,
-        \\{{"jql":{s},"maxResults":{d},"fields":["summary","status","assignee","priority","issuetype","updated","duedate","created","project","labels","description","parent","components","fixVersions"]}}
-    , .{ jql_q, max_results });
+    const fields = [_][]const u8{
+        "summary",     "status",     "assignee", "priority", "issuetype",
+        "updated",     "duedate",    "created",  "project",  "labels",
+        "description", "parent",     "components", "fixVersions",
+    };
+    const body = try std.json.Stringify.valueAlloc(allocator, .{
+        .jql = jql,
+        .maxResults = max_results,
+        .fields = fields[0..],
+    }, .{});
     defer allocator.free(body);
     return client.request(.{ .method = .POST, .url = url, .auth_header = auth, .body = body });
-}
-
-fn quote(allocator: Allocator, s: []const u8) ![]const u8 {
-    var list: std.ArrayList(u8) = .empty;
-    errdefer list.deinit(allocator);
-    try list.append(allocator, '"');
-    for (s) |c| {
-        if (c == '"' or c == '\\') try list.append(allocator, '\\');
-        try list.append(allocator, c);
-    }
-    try list.append(allocator, '"');
-    return try list.toOwnedSlice(allocator);
 }
 
 test "issue get path includes expand=names,schema" {
