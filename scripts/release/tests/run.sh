@@ -48,6 +48,18 @@ echo "== read_version zig.zon =="
 load_tool atlassian
 assert_eq 0.1.0 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "atlassian build.zig.zon"
 
+echo "== write_version zig.zon syncs CLI VERSION const =="
+# Temp copies so the working tree stays at 0.1.0
+_tmpd="$(mktemp -d)"
+cp "$REPO_ROOT/atlassian/build.zig.zon" "$_tmpd/build.zig.zon"
+mkdir -p "$_tmpd/src/cli"
+cp "$REPO_ROOT/atlassian/src/cli/root.zig" "$_tmpd/src/cli/root.zig"
+write_version "$_tmpd/build.zig.zon" zig.zon "9.8.7"
+assert_eq 9.8.7 "$(read_version "$_tmpd/build.zig.zon" zig.zon)" "temp zon bumped"
+_cli_ver="$(grep -E '^pub const VERSION = "' "$_tmpd/src/cli/root.zig" | head -n1 | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')"
+assert_eq 9.8.7 "$_cli_ver" "CLI root.zig VERSION stays in sync"
+rm -rf "$_tmpd"
+
 echo "== read_version plain (9cc) =="
 load_tool 9cc
 assert_eq 0.5.4 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "9cc VERSION"
