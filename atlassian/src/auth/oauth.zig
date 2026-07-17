@@ -6,15 +6,26 @@ const store = @import("store.zig");
 
 pub const DEFAULT_CALLBACK_PORT: u16 = 8787;
 
+// Confluence REST v2 needs granular space/page scopes; classic content-only → 401 scope mismatch.
 pub const DEFAULT_SCOPES: []const u8 =
     "read:jira-work write:jira-work read:jira-user offline_access " ++
     "read:board-scope:jira-software read:sprint:jira-software " ++
     "read:issue-details:jira read:project:jira read:jql:jira " ++
-    "read:confluence-content.all write:confluence-content manage:confluence-content read:me";
+    "read:confluence-content.all write:confluence-content manage:confluence-content " ++
+    "read:confluence-space.summary " ++
+    "read:space:confluence read:page:confluence write:page:confluence delete:page:confluence " ++
+    "read:me";
 
 pub const REQUIRED_AGILE_SCOPES = [_][]const u8{
     "read:board-scope:jira-software",
     "read:issue-details:jira",
+};
+
+pub const REQUIRED_CONFLUENCE_SCOPES = [_][]const u8{
+    "read:space:confluence",
+    "read:page:confluence",
+    "write:page:confluence",
+    "delete:page:confluence",
 };
 
 pub fn scopeContains(scope_list: []const u8, needle: []const u8) bool {
@@ -28,6 +39,19 @@ pub fn scopeContains(scope_list: []const u8, needle: []const u8) bool {
 pub fn missingAgileScopes(scope_list: []const u8, buf: [][]const u8) []const []const u8 {
     var n: usize = 0;
     for (REQUIRED_AGILE_SCOPES) |s| {
+        if (!scopeContains(scope_list, s)) {
+            if (n < buf.len) {
+                buf[n] = s;
+                n += 1;
+            }
+        }
+    }
+    return buf[0..n];
+}
+
+pub fn missingConfluenceScopes(scope_list: []const u8, buf: [][]const u8) []const []const u8 {
+    var n: usize = 0;
+    for (REQUIRED_CONFLUENCE_SCOPES) |s| {
         if (!scopeContains(scope_list, s)) {
             if (n < buf.len) {
                 buf[n] = s;
@@ -195,4 +219,17 @@ test "authorizeUrl uses encoded redirect_uri" {
     try std.testing.expect(std.mem.indexOf(u8, u, "client_id=CID") != null);
     try std.testing.expect(std.mem.indexOf(u8, u, "state=STATE") != null);
     try std.testing.expect(std.mem.indexOf(u8, u, "redirect_uri=http%3A%2F%2F127.0.0.1%3A8787%2Fcallback") != null);
+}
+
+test "missingConfluenceScopes detects space/page granular gaps" {
+    var buf: [8][]const u8 = undefined;
+    const classic_only = "read:confluence-content.all write:confluence-content read:me";
+    const miss = missingConfluenceScopes(classic_only, &buf);
+    try std.testing.expect(miss.len == 4);
+    try std.testing.expect(scopeContains(DEFAULT_SCOPES, "read:space:confluence"));
+    try std.testing.expect(scopeContains(DEFAULT_SCOPES, "read:page:confluence"));
+    try std.testing.expect(scopeContains(DEFAULT_SCOPES, "write:page:confluence"));
+    try std.testing.expect(scopeContains(DEFAULT_SCOPES, "delete:page:confluence"));
+    const full = "read:space:confluence read:page:confluence write:page:confluence delete:page:confluence";
+    try std.testing.expect(missingConfluenceScopes(full, &buf).len == 0);
 }
