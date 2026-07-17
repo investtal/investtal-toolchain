@@ -90,25 +90,18 @@ fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expecte
     // Skip non-callback sockets (favicon/noise) until code+state arrive.
     while (true) {
         var stream = try server.accept(io);
+        defer stream.close(io);
+
         const req = readHttpHeaders(allocator, io, &stream) catch |err| {
-            stream.close(io);
-            if (err == error.IncompleteRequest) continue;
-            return err;
+            // Only OOM is fatal; RequestTooLarge / incomplete / read errors are noise.
+            if (err == error.OutOfMemory) return err;
+            continue;
         };
         defer allocator.free(req);
 
-        const code = findQueryParam(req, "code") orelse {
-            stream.close(io);
-            continue;
-        };
-        const st = findQueryParam(req, "state") orelse {
-            stream.close(io);
-            continue;
-        };
-        if (!std.mem.eql(u8, st, expected_state)) {
-            stream.close(io);
-            return error.StateMismatch;
-        }
+        const code = findQueryParam(req, "code") orelse continue;
+        const st = findQueryParam(req, "state") orelse continue;
+        if (!std.mem.eql(u8, st, expected_state)) return error.StateMismatch;
 
         const body =
             \\<!doctype html><html><body>
@@ -123,11 +116,11 @@ fn waitForCallback(allocator: Allocator, io: Io, server: *Io.net.Server, expecte
         );
         defer allocator.free(response);
 
+        // Best-effort success page; browser may already have closed after redirect.
         var wbuf: [1024]u8 = undefined;
         var writer = stream.writer(io, &wbuf);
-        try writer.interface.writeAll(response);
-        try writer.interface.flush();
-        stream.close(io);
+        writer.interface.writeAll(response) catch {};
+        writer.interface.flush() catch {};
 
         return try allocator.dupe(u8, code);
     }
