@@ -1,5 +1,5 @@
 # @investtal/proto-plugins — atlassian
-# Upstream release: investtal/investtal-toolchain tags atlassian-v*
+# Upstream release: investtal/investtal-toolchain tags atlassian-v* (created by Jenkins)
 
 name = "Atlassian CLI"
 type = "cli"
