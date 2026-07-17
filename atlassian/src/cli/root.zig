@@ -269,14 +269,12 @@ fn openSession(allocator: std.mem.Allocator, io: Io, global: flags.Global) !Sess
     errdefer cfg.deinit(allocator);
     var tokens = auth_store.loadTokens(allocator, io) catch null;
 
-    // OAuth ensureValid: refresh when access token is near expiry (best-effort).
+    // OAuth ensureValid: refresh when access token is near absolute expiry.
     if (cfg.auth_mode == .oauth) {
         if (tokens) |*t| {
-            // expires_at_unix may be absolute or relative (legacy); refresh if small or past.
-            const now_approx: i64 = 0; // wall clock not required when value is relative-ish
-            _ = now_approx;
+            const now = Io.Clock.real.now(io).toSeconds();
             if (t.refresh_token) |rt| {
-                if (t.expires_at_unix < 120) {
+                if (t.expires_at_unix < now + 120) {
                     if (cfg.oauth_client_id) |cid| {
                         if (cfg.oauth_client_secret) |sec| {
                             var client: http_client.Client = .{ .allocator = allocator, .io = io, .retries = cfg.http_retries };

@@ -32,7 +32,18 @@ pub fn successBody(ctx: Context, body: []const u8, human_fallback: []const u8) v
 
 pub fn fail(ctx: Context, code: u8, message: []const u8) u8 {
     if (ctx.json) {
-        const payload = std.fmt.allocPrint(ctx.allocator, "{{\"ok\":false,\"error\":{{\"kind\":\"config\",\"status\":null,\"code\":null,\"message\":{s},\"details\":null,\"request_id\":null,\"retriable\":false}}}}", .{jsonQuote(ctx.allocator, message) catch "\"error\""}) catch {
+        const payload = std.json.Stringify.valueAlloc(ctx.allocator, .{
+            .ok = false,
+            .@"error" = .{
+                .kind = "config",
+                .status = null,
+                .code = null,
+                .message = message,
+                .details = null,
+                .request_id = null,
+                .retriable = false,
+            },
+        }, .{}) catch {
             ctx.err.print("Error: {s}\n", .{message}) catch {};
             return code;
         };
@@ -66,18 +77,10 @@ pub fn failApi(ctx: Context, err: ApiError) u8 {
     return err.exitCode();
 }
 
-fn jsonQuote(allocator: std.mem.Allocator, s: []const u8) ![]const u8 {
-    var list: std.ArrayList(u8) = .empty;
-    errdefer list.deinit(allocator);
-    try list.append(allocator, '"');
-    for (s) |c| {
-        switch (c) {
-            '"' => try list.appendSlice(allocator, "\\\""),
-            '\\' => try list.appendSlice(allocator, "\\\\"),
-            '\n' => try list.appendSlice(allocator, "\\n"),
-            else => try list.append(allocator, c),
-        }
-    }
-    try list.append(allocator, '"');
-    return try list.toOwnedSlice(allocator);
+test "fail json escapes control chars in message" {
+    // Smoke: Stringify escapes newlines/quotes for us.
+    const a = std.testing.allocator;
+    const s = try std.json.Stringify.valueAlloc(a, .{ .message = "a\nb\"c" }, .{});
+    defer a.free(s);
+    try std.testing.expect(std.mem.indexOf(u8, s, "\\n") != null);
 }

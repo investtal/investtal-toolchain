@@ -4,6 +4,15 @@ const http_client = @import("../http/client.zig");
 const transport = @import("../http/transport.zig");
 const ApiError = @import("../http/error.zig").ApiError;
 
+const GqlError = struct {
+    message: []const u8 = "",
+};
+
+const GqlResponse = struct {
+    data: ?std.json.Value = null,
+    errors: ?[]const GqlError = null,
+};
+
 pub fn execute(
     client: *http_client.Client,
     allocator: Allocator,
@@ -15,12 +24,17 @@ pub fn execute(
     const url = try site.resolve(allocator, .graphql, "");
     defer allocator.free(url);
 
-    const q_json = try jsonString(allocator, query);
-    defer allocator.free(q_json);
-    const body = if (variables_json) |v|
-        try std.fmt.allocPrint(allocator, "{{\"query\":{s},\"variables\":{s}}}", .{ q_json, v })
-    else
-        try std.fmt.allocPrint(allocator, "{{\"query\":{s}}}", .{q_json});
+    var body: []u8 = undefined;
+    if (variables_json) |v| {
+        var vars_parsed = try std.json.parseFromSlice(std.json.Value, allocator, v, .{ .allocate = .alloc_always });
+        defer vars_parsed.deinit();
+        body = try std.json.Stringify.valueAlloc(allocator, .{
+            .query = query,
+            .variables = vars_parsed.value,
+        }, .{});
+    } else {
+        body = try std.json.Stringify.valueAlloc(allocator, .{ .query = query }, .{});
+    }
     defer allocator.free(body);
 
     var result = try client.request(.{
@@ -30,12 +44,20 @@ pub fn execute(
         .body = body,
     });
 
-    // Surface GraphQL errors when present with non-null errors array.
+    // Surface GraphQL errors via structured JSON parse (not substring scan).
     switch (result) {
         .ok => |r| {
-            if (std.mem.indexOf(u8, r.body, "\"errors\"")) |_| {
-                if (std.mem.indexOf(u8, r.body, "\"data\":null") != null or std.mem.indexOf(u8, r.body, "\"data\": null") != null) {
-                    var err = try ApiError.fromHttp(allocator, 200, r.body, null);
+            var parsed = std.json.parseFromSlice(GqlResponse, allocator, r.body, .{
+                .allocate = .alloc_always,
+                .ignore_unknown_fields = true,
+            }) catch {
+                return result;
+            };
+            defer parsed.deinit();
+            if (parsed.value.errors) |errs| {
+                if (errs.len > 0 and (parsed.value.data == null or parsed.value.data.? == .null)) {
+                    const msg = if (errs[0].message.len > 0) errs[0].message else "GraphQL error";
+                    var err = try ApiError.fromHttp(allocator, 200, msg, null);
                     err.kind = .decode;
                     result.deinit(allocator);
                     return .{ .err = err };
@@ -47,25 +69,9 @@ pub fn execute(
     return result;
 }
 
-fn jsonString(allocator: Allocator, s: []const u8) ![]const u8 {
-    var list: std.ArrayList(u8) = .empty;
-    errdefer list.deinit(allocator);
-    try list.append(allocator, '"');
-    for (s) |c| {
-        switch (c) {
-            '"' => try list.appendSlice(allocator, "\\\""),
-            '\\' => try list.appendSlice(allocator, "\\\\"),
-            '\n' => try list.appendSlice(allocator, "\\n"),
-            else => try list.append(allocator, c),
-        }
-    }
-    try list.append(allocator, '"');
-    return try list.toOwnedSlice(allocator);
-}
-
-test "graphql body builder contains query" {
+test "graphql stringify body contains query" {
     const a = std.testing.allocator;
-    const q = try jsonString(a, "query { x }");
-    defer a.free(q);
-    try std.testing.expect(std.mem.indexOf(u8, q, "query") != null);
+    const body = try std.json.Stringify.valueAlloc(a, .{ .query = "query { x }" }, .{});
+    defer a.free(body);
+    try std.testing.expect(std.mem.indexOf(u8, body, "query { x }") != null);
 }

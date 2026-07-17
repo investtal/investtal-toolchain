@@ -135,6 +135,12 @@ fn findQueryParam(req: []const u8, key: []const u8) ?[]const u8 {
     return null;
 }
 
+const AccessibleResource = struct {
+    id: []const u8,
+    url: ?[]const u8 = null,
+    name: ?[]const u8 = null,
+};
+
 fn fetchCloudId(allocator: Allocator, client: *http_client.Client, access_token: []const u8, preferred_url: ?[]const u8) !?[]u8 {
     const auth = try std.fmt.allocPrint(allocator, "Bearer {s}", .{access_token});
     defer allocator.free(auth);
@@ -147,25 +153,25 @@ fn fetchCloudId(allocator: Allocator, client: *http_client.Client, access_token:
     switch (result) {
         .err => return null,
         .ok => |r| {
-            // Prefer resource matching preferred_url
+            var parsed = std.json.parseFromSlice([]AccessibleResource, allocator, r.body, .{
+                .allocate = .alloc_always,
+                .ignore_unknown_fields = true,
+            }) catch return null;
+            defer parsed.deinit();
+            if (parsed.value.len == 0) return null;
+
             if (preferred_url) |pu| {
-                if (std.mem.indexOf(u8, r.body, pu)) |_| {
-                    if (extractFirstId(r.body)) |id| return try allocator.dupe(u8, id);
+                const pref = std.mem.trimEnd(u8, pu, "/");
+                for (parsed.value) |res| {
+                    if (res.url) |u| {
+                        const ru = std.mem.trimEnd(u8, u, "/");
+                        if (std.mem.eql(u8, ru, pref) or std.mem.startsWith(u8, ru, pref) or std.mem.startsWith(u8, pref, ru)) {
+                            return try allocator.dupe(u8, res.id);
+                        }
+                    }
                 }
             }
-            if (extractFirstId(r.body)) |id| return try allocator.dupe(u8, id);
-            return null;
+            return try allocator.dupe(u8, parsed.value[0].id);
         },
     }
-}
-
-fn extractFirstId(body: []const u8) ?[]const u8 {
-    const idx = std.mem.indexOf(u8, body, "\"id\"") orelse return null;
-    var i = idx + 4;
-    while (i < body.len and body[i] != '"') : (i += 1) {}
-    if (i >= body.len) return null;
-    i += 1;
-    const start = i;
-    while (i < body.len and body[i] != '"') : (i += 1) {}
-    return body[start..i];
 }
