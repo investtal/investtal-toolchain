@@ -1,4 +1,4 @@
-atlassian = "0.1.2"
+atlassian = "0.2.1"
 
 [plugins.tools]
 atlassian = "https://raw.githubusercontent.com/investtal/investtal-toolchain/e78b759f0a4e63a8d662b49fe4f47ec5af5df3d0/proto/atlassian/plugin.toml"
