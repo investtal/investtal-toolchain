@@ -63,13 +63,20 @@ fn resolveCloudOAuth(allocator: Allocator, base: []const u8, cloud_id: ?[]const 
                 return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/api/3", .{cid});
             return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/api/3/{s}", .{ cid, path });
         },
+        .jira_software => {
+            // Same cloud gateway as Jira REST; Agile lives under /rest/agile/1.0.
+            const cid = cloud_id orelse return error.MissingCloudId;
+            if (path.len == 0)
+                return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/agile/1.0", .{cid});
+            return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/jira/{s}/rest/agile/1.0/{s}", .{ cid, path });
+        },
         .confluence => {
             const cid = cloud_id orelse return error.MissingCloudId;
             if (path.len == 0)
                 return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/confluence/{s}/wiki/api/v2", .{cid});
             return try std.fmt.allocPrint(allocator, "https://api.atlassian.com/ex/confluence/{s}/wiki/api/v2/{s}", .{ cid, path });
         },
-        .jira_software, .gateway, .graphql => return resolveCloudBasic(allocator, base, product, path),
+        .gateway, .graphql => return resolveCloudBasic(allocator, base, product, path),
     }
 }
 
@@ -85,4 +92,11 @@ test "resolve jira oauth cloud" {
     const u = try site.resolve(std.testing.allocator, .jira, "issue/A-1");
     defer std.testing.allocator.free(u);
     try std.testing.expectEqualStrings("https://api.atlassian.com/ex/jira/cid/rest/api/3/issue/A-1", u);
+}
+
+test "resolve jira software oauth cloud" {
+    const site = Site{ .base_url = "https://acme.atlassian.net", .cloud_id = "cid", .auth_mode = .oauth };
+    const u = try site.resolve(std.testing.allocator, .jira_software, "board/1/backlog");
+    defer std.testing.allocator.free(u);
+    try std.testing.expectEqualStrings("https://api.atlassian.com/ex/jira/cid/rest/agile/1.0/board/1/backlog", u);
 }

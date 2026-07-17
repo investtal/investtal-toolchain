@@ -5,9 +5,42 @@ const http_client = @import("../http/client.zig");
 const store = @import("store.zig");
 
 pub const DEFAULT_CALLBACK_PORT: u16 = 8787;
-pub const DEFAULT_SCOPES =
-    \\read:jira-work write:jira-work read:jira-user offline_access read:confluence-content.all write:confluence-content manage:confluence-content read:me
-;
+// Classic Jira platform (issue search/get) + granular Jira Software (Agile boards).
+// Jira Software does NOT accept classic scopes for /rest/agile — board APIs need
+// read:board-scope:jira-software (see developer.atlassian.com/cloud/jira/software/...).
+//
+// After changing this list you MUST:
+//   1) developer console → app → Permissions → enable **Jira Software API** (not only Jira API)
+//      and tick the granular scopes below
+//   2) Revoke the app at https://id.atlassian.com/manage-profile/apps (optional but reliable)
+//   3) `atlassian auth login` again (refresh does NOT add scopes)
+pub const DEFAULT_SCOPES: []const u8 =
+    "read:jira-work write:jira-work read:jira-user offline_access " ++
+    "read:board-scope:jira-software read:sprint:jira-software " ++
+    "read:issue-details:jira read:project:jira read:jql:jira " ++
+    "read:confluence-content.all write:confluence-content manage:confluence-content read:me";
+
+pub const REQUIRED_AGILE_SCOPES = [_][]const u8{
+    "read:board-scope:jira-software",
+    "read:issue-details:jira",
+};
+
+pub fn scopeContains(scope_list: []const u8, needle: []const u8) bool {
+    return std.mem.indexOf(u8, scope_list, needle) != null;
+}
+
+pub fn missingAgileScopes(scope_list: []const u8, buf: [][]const u8) []const []const u8 {
+    var n: usize = 0;
+    for (REQUIRED_AGILE_SCOPES) |s| {
+        if (!scopeContains(scope_list, s)) {
+            if (n < buf.len) {
+                buf[n] = s;
+                n += 1;
+            }
+        }
+    }
+    return buf[0..n];
+}
 
 fn urlEncodeQuery(allocator: Allocator, s: []const u8) ![]u8 {
     var list: std.ArrayList(u8) = .empty;
