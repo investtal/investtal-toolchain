@@ -7,10 +7,30 @@ set -euo pipefail
 #   HEAD_SHA — git range end (default: HEAD)
 #   GITHUB_REPOSITORY — optional (default investtal/investtal-toolchain)
 #   BRANCH_NAME / GIT_BRANCH — Jenkins branch (create-tag-and-push requires main)
+#   FORCE_RELEASE_TOOLS — comma-separated tool names to release even if paths unchanged
 # Dependencies: bash, git, curl, gh (publish); PR title via gh | python3 | sed
 # shellcheck source=/dev/null
 source "$(cd "$(dirname "$0")" && pwd)/lib.sh"
 cd "$REPO_ROOT"
+
+# True if this tool has never been tagged as {tool}-v* (local after fetch --tags).
+tool_never_tagged() {
+  local tool="$1"
+  # List local tags matching prefix; empty → never released under new scheme.
+  if git tag -l "${tool}-v*" 2>/dev/null | grep -q .; then
+    return 1
+  fi
+  return 0
+}
+
+# Append unique tool name to tools array (bash 3.2 — no associative arrays).
+tools_append_unique() {
+  local candidate="$1" t
+  for t in "${tools[@]+"${tools[@]}"}"; do
+    [[ "$t" == "$candidate" ]] && return 0
+  done
+  tools+=("$candidate")
+}
 
 # Package binary assets (if needed) and publish GitHub Release for tool@ver.
 package_and_publish() {
@@ -183,8 +203,38 @@ while IFS= read -r t || [[ -n "$t" ]]; do
 done <"$_tools_tmp"
 rm -f "$_tools_tmp"
 
+# FORCE_RELEASE_TOOLS=atlassian,9cc — manual recovery / ops rebuild
+if [[ -n "${FORCE_RELEASE_TOOLS:-}" ]]; then
+  _force_ifs="$IFS"
+  IFS=','
+  # shellcheck disable=SC2086
+  set -- ${FORCE_RELEASE_TOOLS}
+  IFS="$_force_ifs"
+  for t in "$@"; do
+    t="$(echo "$t" | tr -d '[:space:]')"
+    [[ -n "$t" ]] || continue
+    load_tool "$t" >/dev/null
+    tools_append_unique "$t"
+    echo "force include tool: $t"
+  done
+fi
+
+# First-time bootstrap: tools that never got a {tool}-v* tag (e.g. first main
+# release failed at preflight before tagging). Ship current VERSION as-is.
+_bootstrap=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^#|^$ ]] && continue
+  IFS='|' read -r _name _rest <<<"$line"
+  [[ -n "$_name" ]] || continue
+  if tool_never_tagged "$_name"; then
+    _bootstrap+=("$_name")
+    tools_append_unique "$_name"
+    echo "bootstrap initial release (no ${_name}-v* tags yet): $_name"
+  fi
+done <"$MANIFEST"
+
 if [[ ${#tools[@]} -eq 0 ]]; then
-  echo "no releasable tools changed"
+  echo "no releasable tools changed (and none need bootstrap)"
   exit 0
 fi
 
@@ -198,23 +248,53 @@ if ! title="$(resolve_pr_title "$sha" "$repo" "$token")"; then
 fi
 
 level="$("$RELEASE_ROOT/detect-bump-level.sh" "$title")"
+# Bootstrap-only (no path changes + no force): allow patch when there is no PR title.
+# Path-based releases still require a real PR title level.
+_only_bootstrap=1
+for tool in "${tools[@]}"; do
+  _is_boot=0
+  for b in "${_bootstrap[@]+"${_bootstrap[@]}"}"; do
+    [[ "$b" == "$tool" ]] && _is_boot=1 && break
+  done
+  if [[ "$_is_boot" -eq 0 ]]; then
+    _only_bootstrap=0
+    break
+  fi
+done
 if [[ "$level" == "none" ]]; then
-  echo "no PR / none bump — skip"
-  exit 0
+  if [[ "$_only_bootstrap" -eq 1 || -n "${FORCE_RELEASE_TOOLS:-}" ]]; then
+    level="patch"
+    echo "no PR title — using level=patch for bootstrap/force release"
+  else
+    echo "no PR / none bump — skip"
+    exit 0
+  fi
 fi
 
 for tool in "${tools[@]}"; do
   echo "=== releasing $tool (level=$level) ==="
   load_tool "$tool"
-  # Compute target version without writing yet; if tag already exists, skip bump.
   cur="$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")"
-  new_ver="$(semver_bump "$cur" "$level")"
-  tag="${tool}-v${new_ver}"
-  if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-    echo "tag $tag already exists — skip bump; ensure push/package/publish"
-  else
-    new_ver="$("$RELEASE_ROOT/bump-version.sh" "$tool" "$level")"
+  _is_boot=0
+  for b in "${_bootstrap[@]+"${_bootstrap[@]}"}"; do
+    [[ "$b" == "$tool" ]] && _is_boot=1 && break
+  done
+
+  if [[ "$_is_boot" -eq 1 ]]; then
+    # First tag: ship version file as-is (e.g. atlassian-v0.1.0, 9cc-v0.5.4).
+    new_ver="$cur"
     tag="${tool}-v${new_ver}"
+    echo "initial tag $tag from current VERSION (no bump)"
+  else
+    # Compute target version without writing yet; if tag already exists, skip bump.
+    new_ver="$(semver_bump "$cur" "$level")"
+    tag="${tool}-v${new_ver}"
+    if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+      echo "tag $tag already exists — skip bump; ensure push/package/publish"
+    else
+      new_ver="$("$RELEASE_ROOT/bump-version.sh" "$tool" "$level")"
+      tag="${tool}-v${new_ver}"
+    fi
   fi
   "$RELEASE_ROOT/create-tag-and-push.sh" "$tool" "$new_ver"
   package_and_publish "$tool" "$new_ver"

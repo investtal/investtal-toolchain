@@ -33,14 +33,14 @@ fi
 
 # Write a zip containing a single file as its basename (cwd-relative).
 # Args: <output.zip> <file-in-cwd>
+# Prefer Info-ZIP; fall back to python3 zipfile. Return status of the command that ran.
 make_zip() {
   local out="$1" file="$2"
   if command -v zip >/dev/null 2>&1; then
     zip -q "$out" "$file"
-    return 0
-  fi
-  # Agent images often lack Info-ZIP; stdlib zipfile is enough.
-  python3 - "$out" "$file" <<'PY'
+  else
+    # Agent images often lack Info-ZIP; stdlib zipfile is enough.
+    python3 - "$out" "$file" <<'PY'
 import sys
 import zipfile
 
@@ -48,6 +48,7 @@ out_path, name = sys.argv[1], sys.argv[2]
 with zipfile.ZipFile(out_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
     zf.write(name, arcname=name)
 PY
+  fi
 }
 
 mkdir -p "$OUT_DIR"

@@ -129,7 +129,11 @@ pipeline {
                             missing="${missing} python3|node|jq"
                           fi
                         fi
-                        # zip is optional: package-atlassian falls back to python3 zipfile
+                        # Windows packaging needs zip CLI or python3 zipfile
+                        if ! command -v zip >/dev/null 2>&1 \
+                           && ! command -v python3 >/dev/null 2>&1; then
+                          missing="${missing} zip|python3"
+                        fi
                         if [ -n "$missing" ]; then
                           echo "release preflight: missing required tools:${missing}" >&2
                           exit 1
