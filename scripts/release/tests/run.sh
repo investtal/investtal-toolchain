@@ -54,7 +54,7 @@ assert_eq 0.5.4 "$(read_version "$REPO_ROOT/$VERSION_FILE" "$VERSION_KIND")" "9c
 
 echo "== bash -n syntax (release scripts) =="
 for s in bump-version.sh create-tag-and-push.sh detect-bump-level.sh detect-changed-tools.sh \
-         lib.sh publish-github-release.sh run-auto-release.sh; do
+         ensure-zig.sh lib.sh package-atlassian.sh publish-github-release.sh run-auto-release.sh; do
   if bash -n "$ROOT/$s"; then
     echo "  ✓ bash -n $s"; pass=$((pass+1))
   else
