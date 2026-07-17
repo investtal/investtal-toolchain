@@ -38,7 +38,8 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
         const agile_ok = has_board and has_issue_details;
         const conf_ok = auth_oauth.scopeContains(scope, "read:space:confluence") and
             auth_oauth.scopeContains(scope, "read:page:confluence");
-        const conf_write_ok = auth_oauth.scopeContains(scope, "write:page:confluence");
+        const conf_write_ok = auth_oauth.scopeContains(scope, "write:page:confluence") and
+            auth_oauth.scopeContains(scope, "delete:page:confluence");
         const text = std.fmt.allocPrint(allocator,
             \\mode={s}
             \\url={s}
@@ -59,7 +60,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
             if (conf_ok and conf_write_ok)
                 "ok"
             else if (conf_ok)
-                "read-ok write-MISSING (need write:page:confluence for page create/update)"
+                "read-ok write-MISSING (need write:page:confluence + delete:page:confluence)"
             else
                 "MISSING (need read:space:confluence + read:page:confluence for v2 space/page)",
             if (!conf_ok)
