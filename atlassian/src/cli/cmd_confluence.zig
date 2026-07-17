@@ -28,7 +28,7 @@ fn handleConfResult(ctx: render.Context, allocator: std.mem.Allocator, result: *
     switch (result.*) {
         .err => |e| {
             if ((e.status == 401 or e.status == 403) and !ctx.isJson()) {
-                if (std.mem.indexOf(u8, e.message, "scope") != null) {
+                if (std.ascii.indexOfIgnoreCase(e.message, "scope") != null) {
                     result.deinit(allocator);
                     return render.fail(ctx, exit_codes.auth, scope_hint);
                 }
