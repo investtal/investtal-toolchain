@@ -7,7 +7,8 @@ const ApiError = @import("error.zig").ApiError;
 pub const Request = struct {
     method: http.Method = .GET,
     url: []const u8,
-    auth_header: []const u8,
+    /// `Authorization` value (`Bearer …` / `Basic …`); `null` omits the header.
+    auth_header: ?[]const u8 = null,
     body: ?[]const u8 = null,
     content_type: []const u8 = "application/json",
 };
@@ -138,14 +139,13 @@ pub const Client = struct {
         var body_aw: Io.Writer.Allocating = .fromArrayList(self.allocator, &body_list);
         defer body_aw.deinit();
 
-        const auth_value = req.auth_header;
         const result = client.fetch(.{
             .location = .{ .url = req.url },
             .method = req.method,
             .payload = req.body,
             .response_writer = &body_aw.writer,
             .headers = .{
-                .authorization = .{ .override = auth_value },
+                .authorization = if (req.auth_header) |auth| .{ .override = auth } else .omit,
                 .content_type = if (req.body != null) .{ .override = req.content_type } else .omit,
                 .accept_encoding = .omit,
             },
