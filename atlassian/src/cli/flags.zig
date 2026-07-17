@@ -28,6 +28,9 @@ pub fn parse(allocator: Allocator, args: []const []const u8) !Global {
     var i: usize = 1; // skip argv0
     var rest_list: std.ArrayList([]const u8) = .empty;
     defer rest_list.deinit(allocator);
+    errdefer {
+        for (rest_list.items) |s| allocator.free(s);
+    }
 
     var past_flags = false;
     while (i < args.len) : (i += 1) {

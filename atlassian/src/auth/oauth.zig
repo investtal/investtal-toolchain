@@ -55,13 +55,17 @@ pub fn parseTokenJson(allocator: Allocator, body: []const u8, now_unix: i64) !st
     });
     defer parsed.deinit();
     const v = parsed.value;
-    return .{
+    var tokens = store.TokenSet{
         .access_token = try allocator.dupe(u8, v.access_token),
-        .refresh_token = if (v.refresh_token) |r| try allocator.dupe(u8, r) else null,
+        .refresh_token = null,
         .expires_at_unix = now_unix + v.expires_in,
-        .scope = if (v.scope) |s| try allocator.dupe(u8, s) else null,
+        .scope = null,
         .owns = true,
     };
+    errdefer tokens.deinit(allocator);
+    if (v.refresh_token) |r| tokens.refresh_token = try allocator.dupe(u8, r);
+    if (v.scope) |s| tokens.scope = try allocator.dupe(u8, s);
+    return tokens;
 }
 
 fn nowUnix(io: Io) i64 {

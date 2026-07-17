@@ -46,7 +46,7 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
     if (std.mem.eql(u8, verb, "login")) {
         var tokens = auth_login.interactiveLogin(allocator, io, cfg, auth_oauth.DEFAULT_SCOPES) catch |err| {
             const msg = std.fmt.allocPrint(allocator, "oauth login failed: {s}", .{@errorName(err)}) catch "oauth login failed";
-            defer allocator.free(msg);
+            defer if (msg.ptr != "oauth login failed".ptr) allocator.free(msg);
             return render.fail(ctx, exit_codes.auth, msg);
         };
         defer tokens.deinit(allocator);

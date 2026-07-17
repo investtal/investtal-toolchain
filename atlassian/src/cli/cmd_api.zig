@@ -53,7 +53,9 @@ pub fn run(ctx: render.Context, allocator: std.mem.Allocator, io: Io, global: fl
     };
     defer sess.deinit(allocator);
 
-    const body = util.readBodyArg(allocator, io, rest) catch null;
+    const body = util.readBodyArg(allocator, io, rest) catch |err| {
+        return render.fail(ctx, exit_codes.usage, @errorName(err));
+    };
     defer if (body) |b| allocator.free(b);
 
     var result = api_raw.rawRequest(&sess.client, allocator, sess.site, sess.auth_header, method, product, path, body) catch return render.fail(ctx, exit_codes.network, "request failed");
