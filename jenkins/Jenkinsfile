@@ -69,9 +69,17 @@ pipeline {
 
         stage('Matrix: real macOS 9cc') {
             // Fleet is Ubuntu-only today; stage no-ops until a `macos` agent exists.
+            // Use offline:true so an offline mac agent still counts as "available to schedule"
+            // without a hard failure. Empty label → quiet skip (no "Configuration error").
             steps {
                 script {
-                    def macAgent = nodesByLabel label: 'macos'
+                    def macAgent = []
+                    try {
+                        // offline: true includes offline agents; empty list is fine.
+                        macAgent = nodesByLabel(label: 'macos', offline: true)
+                    } catch (ignored) {
+                        macAgent = []
+                    }
                     if (macAgent) {
                         node('macos') {
                             sh '''
@@ -81,10 +89,8 @@ pipeline {
                             '''
                         }
                     } else {
-                        echo 'IVT-0610: no `macos` Jenkins agent yet — skipping real macOS run. ' +
-                             'The Linux stage already runs the macOS-strict base64 shim (Cycle 14c) ' +
-                             'so the original update-decode regression is covered. Add a macos-labeled ' +
-                             'agent to enable native runs.'
+                        echo 'IVT-0610: skip real macOS (no agent with label macos). ' +
+                             'Linux stage already runs the macOS-strict base64 shim (Cycle 14c).'
                     }
                 }
             }
@@ -155,7 +161,20 @@ pipeline {
     post {
         always {
             sh 'rm -rf "$CC9_HOME" "$CC9_BIN_DIR" || true'
-            archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+            // Only archive when a release stage produced files under dist/
+            // (PR builds never do). allowEmptyArchive alone still logs
+            // "Configuration error?" for empty globs — skip the step entirely.
+            script {
+                def hasDist = sh(
+                    script: 'find dist -type f 2>/dev/null | head -1 | grep -q .',
+                    returnStatus: true
+                ) == 0
+                if (hasDist) {
+                    archiveArtifacts artifacts: 'dist/**/*', allowEmptyArchive: true
+                } else {
+                    echo 'No dist/ artifacts to archive (normal for PR / non-release runs).'
+                }
+            }
             cleanWs()
         }
         unsuccessful {
