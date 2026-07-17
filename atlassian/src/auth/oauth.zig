@@ -101,7 +101,10 @@ pub fn exchangeCode(
     return switch (result) {
         .ok => |r| {
             if (r.body.len == 0) return error.TokenExchangeEmptyBody;
-            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch return error.TokenExchangeParseFailed;
+            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch |err| switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.TokenExchangeParseFailed,
+            };
         },
         .err => |e| {
             std.log.err("token exchange HTTP {d}: {s}", .{ e.status orelse 0, e.message });
@@ -135,7 +138,10 @@ pub fn refresh(
     return switch (result) {
         .ok => |r| {
             if (r.body.len == 0) return error.TokenRefreshEmptyBody;
-            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch return error.TokenRefreshParseFailed;
+            return parseTokenJson(allocator, r.body, nowUnix(client.io)) catch |err| switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.TokenRefreshParseFailed,
+            };
         },
         .err => |e| {
             if (client.verbose) {
