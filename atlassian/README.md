@@ -5,7 +5,7 @@ Lightweight **Zig 0.16** CLI for day-to-day Atlassian Cloud work: Jira, Confluen
 ## Why
 
 - One binary instead of ad-hoc `curl` / Postman collections for common ops
-- Same auth + retry + error contract for humans (`--help`) and scripts (`--json`)
+- Same auth + retry + error contract for humans (TOON/Markdown) and scripts (`--json`)
 - Installable via Investtal **proto** after release tags `atlassian-v*`
 
 ## Features
@@ -18,6 +18,7 @@ Lightweight **Zig 0.16** CLI for day-to-day Atlassian Cloud work: Jira, Confluen
 | **Auth** | Basic (email + API token), OAuth 2.0 3LO interactive login |
 | **Config** | file + env; precedence `flags > env > file > defaults` |
 | **HTTP** | retries (default 3), structured `ApiError` exit codes |
+| **Output** | **TOON** default ([spec](https://github.com/toon-format/toon)); `--markdown` / `--json` opt-in |
 
 Command shape: `atlassian <product> <resource> <verb> …`
 
@@ -64,15 +65,93 @@ Default file: `~/.config/atlassian/config.toml` (secrets prefer mode `0600` when
 3. Set client id/secret (config or env)
 4. `atlassian auth login`
 
+## Output formats
+
+API success bodies support three modes (last flag wins):
+
+| Flag | Mode | Use for |
+|------|------|---------|
+| _(default)_ / `--toon` | [TOON](https://github.com/toon-format/toon) | Humans + AI (compact, structured) |
+| `--markdown` / `--md` | Markdown | Aligned tables / cards |
+| `--json` | JSON | Scripts |
+
+For **Jira issue get / search**, all three modes use the same **main-field** curation
+(status, assignee, sprint, description, … — not the full REST expand blob).  
+Need the full raw issue? Use `atlassian --json api request GET 'issue/KEY' --product jira`.
+
+```bash
+atlassian jira issue get PROJ-1                 # TOON, main fields
+atlassian --markdown jira issue get PROJ-1      # aligned Markdown table
+atlassian --json jira issue get PROJ-1          # compact JSON, main fields
+atlassian --format=markdown jira issue search --jql 'project = PROJ'
+```
+
+Errors: human text on stderr by default; JSON `ApiError` on stderr when `--json`.
+
 ## Examples
 
 ```bash
 atlassian jira issue get PROJ-1
 atlassian jira issue search --jql 'project = PROJ' --max 20
+atlassian jira issue search --assignee me --jql 'project = PROJ'
+
+# Board backlog + assignee filter
+# Preferred (needs Jira Software OAuth scopes):
+atlassian --markdown jira board backlog --board 1 --assignee me
+# Works with platform scopes only (no Agile):
+atlassian --markdown jira board backlog --project IVT --assignee me
+atlassian --markdown jira board backlog --board 1 --project IVT --assignee me  # Agile, auto JQL fallback on 401
+
+# Active sprint
+atlassian --markdown jira sprint current --assignee me
+atlassian --markdown jira sprint current --board 1 --assignee me
+atlassian --markdown jira sprint issues 7 --assignee unassigned
+
 atlassian confluence page get 123456
 atlassian platform team get TEAM_ID    # requires orgId
 atlassian api request GET issue/PROJ-1 --product jira
 atlassian --json jira issue get PROJ-1
+```
+
+### Assignee filter (`--assignee`)
+
+Works on `issue search`, `board backlog`, `sprint issues`, `sprint current`:
+
+| Value | JQL |
+|-------|-----|
+| `me` | `assignee = currentUser()` |
+| `unassigned` / `none` | `assignee is EMPTY` |
+| email / display name / accountId | `assignee = "…"` |
+
+Combine with extra JQL: `--assignee me --jql 'priority = High'`.
+
+### OAuth: why `board backlog --board` can 401 while `issue search` works
+
+| Command | API | Scopes |
+|---------|-----|--------|
+| `issue search` / `issue get` | Platform `/rest/api/3` | classic `read:jira-work` |
+| `board backlog --board` / `board list` | Agile `/rest/agile/1.0` | granular `read:board-scope:jira-software` + `read:issue-details:jira` |
+
+**Selecting all permissions under classic “Jira API” is not enough.**  
+In the [Developer Console](https://developer.atlassian.com/console/myapps/) you must also add **Jira Software API** permissions.
+
+Then:
+
+```bash
+# Revoke old grant (otherwise consent may not re-prompt fully)
+# https://id.atlassian.com/manage-profile/apps
+atlassian auth login
+atlassian auth status   # agile_board_scope=ok
+```
+
+`auth refresh` never adds new scopes. If login still omits Software scopes, the app does not have them enabled.
+
+**Works without Agile scopes:**
+
+```bash
+atlassian --markdown jira board backlog --project IVT --assignee me
+atlassian --markdown jira sprint current --assignee me
+atlassian --markdown jira issue search --assignee me --jql 'project = IVT'
 ```
 
 ## Install via proto

@@ -29,7 +29,7 @@ Ship a lightweight, single-binary Zig CLI (`atlassian`) for Atlassian Cloud oper
 | v0.1 surface | **Full command catalog skeleton**; real implementations for auth, config, issue CRUD/search, page CRUD, goals, teams, and `api request` |
 | Deployment | **Cloud first**; `Site` / transport interfaces **Server/DC-ready** without changing command signatures |
 | CLI shape | `atlassian <product> <resource> <verb>` |
-| Output | **Human text/table default**; `--json` opt-in |
+| Output | **TOON default** (human + AI); `--markdown` / `--json` opt-in |
 | Auth | **Basic + OAuth 3LO** (not deferred) |
 | Goals | **Atlassian Goals GraphQL** (not Advanced Roadmaps) |
 | Teams | **Teams Public REST v1** (not Tempo / undocumented internals) |
@@ -50,7 +50,7 @@ Ship a lightweight, single-binary Zig CLI (`atlassian`) for Atlassian Cloud oper
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
 │  Commands (thin)                                             │
-│  parse flags → call service → render (human | json)          │
+│  parse flags → call service → render (toon | markdown | json)│
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
@@ -443,12 +443,14 @@ GraphQL errors map into the same `ApiError` / exit mapping.
 
 ## 10. Output rendering
 
-| Mode | Success | Failure |
-|------|---------|---------|
-| Default | Human tables/key-value on stdout | Human error on stderr |
-| `--json` | JSON resource on stdout | JSON `ApiError` on stderr |
+| Mode | Success (stdout) | Failure (stderr) |
+|------|------------------|------------------|
+| **Default / `--toon`** | JSON body encoded as [TOON](https://github.com/toon-format/toon) (token-efficient, structured) | Human error |
+| `--markdown` / `--md` | Curated Markdown (Jira issue cards, search tables; generic KV otherwise) | Human error |
+| `--json` | Raw JSON resource | JSON `ApiError` |
+| `--format toon\|markdown\|json` | Same as dedicated flags; **last flag wins** | per mode |
 
-No mixing of progress noise on stdout in JSON mode.
+No mixing of progress noise on stdout in JSON mode. Empty success bodies print `ok` (toon/markdown) or a blank line (json).
 
 ---
 
@@ -563,7 +565,7 @@ No network in default `zig build test`.
 | Approach A (layered binary) | Approved |
 | Full catalog skeleton | Approved |
 | Cloud-first, Server/DC-ready transport | Approved |
-| Human default, `--json` opt-in | Approved |
+| TOON default; `--markdown` / `--json` opt-in | Approved (updated 2026-07-17) |
 | `atlassian <product> <resource> <verb>` | Approved |
 | Goals = platform GraphQL; Teams = Public REST | Approved |
 | OAuth 3LO + Basic both in scope | Approved |
