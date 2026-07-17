@@ -102,42 +102,20 @@ pub const ApiError = struct {
     }
 
     pub fn toJson(self: ApiError, allocator: Allocator) ![]u8 {
-        return std.fmt.allocPrint(allocator,
-            \\{{"ok":false,"error":{{"kind":"{s}","status":{s},"code":{s},"message":{s},"details":{s},"request_id":{s},"retriable":{s}}}}}
-        , .{
-            @tagName(self.kind),
-            if (self.status) |s| try std.fmt.allocPrint(allocator, "{d}", .{s}) else "null",
-            try jsonOptString(allocator, self.code),
-            try jsonString(allocator, self.message),
-            try jsonOptString(allocator, self.details),
-            try jsonOptString(allocator, self.request_id),
-            if (self.retriable) "true" else "false",
-        });
+        return try std.json.Stringify.valueAlloc(allocator, .{
+            .ok = false,
+            .@"error" = .{
+                .kind = @tagName(self.kind),
+                .status = self.status,
+                .code = self.code,
+                .message = self.message,
+                .details = self.details,
+                .request_id = self.request_id,
+                .retriable = self.retriable,
+            },
+        }, .{});
     }
 };
-
-fn jsonString(allocator: Allocator, s: []const u8) ![]const u8 {
-    var list: std.ArrayList(u8) = .empty;
-    defer list.deinit(allocator);
-    try list.append(allocator, '"');
-    for (s) |c| {
-        switch (c) {
-            '"' => try list.appendSlice(allocator, "\\\""),
-            '\\' => try list.appendSlice(allocator, "\\\\"),
-            '\n' => try list.appendSlice(allocator, "\\n"),
-            '\r' => try list.appendSlice(allocator, "\\r"),
-            '\t' => try list.appendSlice(allocator, "\\t"),
-            else => try list.append(allocator, c),
-        }
-    }
-    try list.append(allocator, '"');
-    return try list.toOwnedSlice(allocator);
-}
-
-fn jsonOptString(allocator: Allocator, s: ?[]const u8) ![]const u8 {
-    if (s) |v| return jsonString(allocator, v);
-    return "null";
-}
 
 /// Naive extractors — good enough for Atlassian error bodies in unit tests.
 fn extractJsonString(body: []const u8, key: []const u8) ?[]const u8 {

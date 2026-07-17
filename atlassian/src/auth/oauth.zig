@@ -9,58 +9,65 @@ pub const DEFAULT_SCOPES =
     \\read:jira-work write:jira-work read:jira-user offline_access read:confluence-content.all write:confluence-content manage:confluence-content read:me
 ;
 
-pub fn authorizeUrl(allocator: Allocator, client_id: []const u8, redirect_uri: []const u8, state: []const u8, scopes: []const u8) ![]u8 {
-    // Minimal query encoding for spaces.
-    const scope_enc = try std.mem.replaceOwned(u8, allocator, scopes, " ", "%20");
-    defer allocator.free(scope_enc);
-    const redir_enc = try std.mem.replaceOwned(u8, allocator, redirect_uri, ":", "%3A");
-    defer allocator.free(redir_enc);
-    // simplistic — enough for localhost callback
-    return try std.fmt.allocPrint(allocator, "https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={s}&scope={s}&redirect_uri={s}&state={s}&response_type=code&prompt=consent", .{ client_id, scope_enc, redirect_uri, state });
+/// RFC 3986-ish query component encoding (unreserved + sub-delims kept simple).
+fn urlEncodeQuery(allocator: Allocator, s: []const u8) ![]u8 {
+    var list: std.ArrayList(u8) = .empty;
+    errdefer list.deinit(allocator);
+    const hex = "0123456789ABCDEF";
+    for (s) |c| {
+        const unreserved = (c >= 'A' and c <= 'Z') or
+            (c >= 'a' and c <= 'z') or
+            (c >= '0' and c <= '9') or
+            c == '-' or c == '_' or c == '.' or c == '~';
+        if (unreserved) {
+            try list.append(allocator, c);
+        } else {
+            try list.append(allocator, '%');
+            try list.append(allocator, hex[c >> 4]);
+            try list.append(allocator, hex[c & 0xf]);
+        }
+    }
+    return try list.toOwnedSlice(allocator);
 }
 
-pub fn parseTokenJson(allocator: Allocator, body: []const u8) !store.TokenSet {
-    const access = extractString(body, "access_token") orelse return error.InvalidTokenResponse;
-    const refresh_tok = extractString(body, "refresh_token");
-    const expires_in = extractInt(body, "expires_in") orelse 3600;
+pub fn authorizeUrl(allocator: Allocator, client_id: []const u8, redirect_uri: []const u8, state: []const u8, scopes: []const u8) ![]u8 {
+    const scope_enc = try urlEncodeQuery(allocator, scopes);
+    defer allocator.free(scope_enc);
+    const redir_enc = try urlEncodeQuery(allocator, redirect_uri);
+    defer allocator.free(redir_enc);
+    const client_enc = try urlEncodeQuery(allocator, client_id);
+    defer allocator.free(client_enc);
+    const state_enc = try urlEncodeQuery(allocator, state);
+    defer allocator.free(state_enc);
+    return try std.fmt.allocPrint(allocator, "https://auth.atlassian.com/authorize?audience=api.atlassian.com&client_id={s}&scope={s}&redirect_uri={s}&state={s}&response_type=code&prompt=consent", .{ client_enc, scope_enc, redir_enc, state_enc });
+}
+
+const TokenResponse = struct {
+    access_token: []const u8,
+    refresh_token: ?[]const u8 = null,
+    expires_in: i64 = 3600,
+    scope: ?[]const u8 = null,
+};
+
+/// `now_unix` is wall-clock seconds (absolute). `expires_at_unix` is set to now + expires_in.
+pub fn parseTokenJson(allocator: Allocator, body: []const u8, now_unix: i64) !store.TokenSet {
+    var parsed = try std.json.parseFromSlice(TokenResponse, allocator, body, .{
+        .allocate = .alloc_always,
+        .ignore_unknown_fields = true,
+    });
+    defer parsed.deinit();
+    const v = parsed.value;
     return .{
-        .access_token = try allocator.dupe(u8, access),
-        .refresh_token = if (refresh_tok) |r| try allocator.dupe(u8, r) else null,
-        // Callers may overwrite with wall-clock absolute expiry; default is relative-ish.
-        .expires_at_unix = expires_in,
-        .scope = if (extractString(body, "scope")) |s| try allocator.dupe(u8, s) else null,
+        .access_token = try allocator.dupe(u8, v.access_token),
+        .refresh_token = if (v.refresh_token) |r| try allocator.dupe(u8, r) else null,
+        .expires_at_unix = now_unix + v.expires_in,
+        .scope = if (v.scope) |s| try allocator.dupe(u8, s) else null,
         .owns = true,
     };
 }
 
-fn extractString(body: []const u8, key: []const u8) ?[]const u8 {
-    var needle_buf: [64]u8 = undefined;
-    const needle = std.fmt.bufPrint(&needle_buf, "\"{s}\"", .{key}) catch return null;
-    const idx = std.mem.indexOf(u8, body, needle) orelse return null;
-    var i = idx + needle.len;
-    // skip whitespace and colon; handle null
-    while (i < body.len and (body[i] == ' ' or body[i] == '\t' or body[i] == ':')) : (i += 1) {}
-    if (i >= body.len) return null;
-    if (body[i] == 'n') return null; // null
-    if (body[i] != '"') return null;
-    i += 1;
-    const start = i;
-    while (i < body.len and body[i] != '"') : (i += 1) {
-        if (body[i] == '\\' and i + 1 < body.len) i += 1;
-    }
-    return body[start..i];
-}
-
-fn extractInt(body: []const u8, key: []const u8) ?i64 {
-    var needle_buf: [64]u8 = undefined;
-    const needle = std.fmt.bufPrint(&needle_buf, "\"{s}\"", .{key}) catch return null;
-    const idx = std.mem.indexOf(u8, body, needle) orelse return null;
-    var i = idx + needle.len;
-    while (i < body.len and (body[i] == ' ' or body[i] == ':' or body[i] == '\t')) : (i += 1) {}
-    const start = i;
-    while (i < body.len and body[i] >= '0' and body[i] <= '9') : (i += 1) {}
-    if (start == i) return null;
-    return std.fmt.parseInt(i64, body[start..i], 10) catch null;
+fn nowUnix(io: Io) i64 {
+    return Io.Clock.real.now(io).toSeconds();
 }
 
 pub fn exchangeCode(
@@ -71,7 +78,14 @@ pub fn exchangeCode(
     code: []const u8,
     redirect_uri: []const u8,
 ) !store.TokenSet {
-    const body = try std.fmt.allocPrint(allocator, "{{\"grant_type\":\"authorization_code\",\"client_id\":\"{s}\",\"client_secret\":\"{s}\",\"code\":\"{s}\",\"redirect_uri\":\"{s}\"}}", .{ client_id, client_secret, code, redirect_uri });
+    const body_obj = .{
+        .grant_type = "authorization_code",
+        .client_id = client_id,
+        .client_secret = client_secret,
+        .code = code,
+        .redirect_uri = redirect_uri,
+    };
+    const body = try std.json.Stringify.valueAlloc(allocator, body_obj, .{});
     defer allocator.free(body);
 
     var result = try client.request(.{
@@ -82,7 +96,7 @@ pub fn exchangeCode(
     });
     defer result.deinit(allocator);
     return switch (result) {
-        .ok => |r| try parseTokenJson(allocator, r.body),
+        .ok => |r| try parseTokenJson(allocator, r.body, nowUnix(client.io)),
         .err => error.TokenExchangeFailed,
     };
 }
@@ -94,7 +108,13 @@ pub fn refresh(
     client_secret: []const u8,
     refresh_token: []const u8,
 ) !store.TokenSet {
-    const body = try std.fmt.allocPrint(allocator, "{{\"grant_type\":\"refresh_token\",\"client_id\":\"{s}\",\"client_secret\":\"{s}\",\"refresh_token\":\"{s}\"}}", .{ client_id, client_secret, refresh_token });
+    const body_obj = .{
+        .grant_type = "refresh_token",
+        .client_id = client_id,
+        .client_secret = client_secret,
+        .refresh_token = refresh_token,
+    };
+    const body = try std.json.Stringify.valueAlloc(allocator, body_obj, .{});
     defer allocator.free(body);
     var result = try client.request(.{
         .method = .POST,
@@ -104,27 +124,25 @@ pub fn refresh(
     });
     defer result.deinit(allocator);
     return switch (result) {
-        .ok => |r| try parseTokenJson(allocator, r.body),
+        .ok => |r| try parseTokenJson(allocator, r.body, nowUnix(client.io)),
         .err => error.TokenRefreshFailed,
     };
 }
 
 test "parseTokenJson" {
     const body = "{\"access_token\":\"abc\",\"refresh_token\":\"def\",\"expires_in\":3600,\"scope\":\"x\"}";
-    var t = try parseTokenJson(std.testing.allocator, body);
+    var t = try parseTokenJson(std.testing.allocator, body, 1_000_000);
     defer t.deinit(std.testing.allocator);
     try std.testing.expectEqualStrings("abc", t.access_token);
     try std.testing.expectEqualStrings("def", t.refresh_token.?);
+    try std.testing.expectEqual(@as(i64, 1_000_000 + 3600), t.expires_at_unix);
 }
 
-test "authorizeUrl contains client_id" {
+test "authorizeUrl uses encoded redirect_uri" {
     const u = try authorizeUrl(std.testing.allocator, "CID", "http://127.0.0.1:8787/callback", "STATE", "read:me offline_access");
     defer std.testing.allocator.free(u);
     try std.testing.expect(std.mem.indexOf(u8, u, "client_id=CID") != null);
     try std.testing.expect(std.mem.indexOf(u8, u, "state=STATE") != null);
-}
-
-// silence unused Io import if not used in tests
-comptime {
-    _ = Io;
+    // ':' and '/' must be percent-encoded in redirect_uri
+    try std.testing.expect(std.mem.indexOf(u8, u, "redirect_uri=http%3A%2F%2F127.0.0.1%3A8787%2Fcallback") != null);
 }
